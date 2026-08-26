@@ -17,10 +17,21 @@ export async function onRequestOptions() {
     status: 204,
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, x-razorpay-signature",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     },
   });
+}
+
+export async function onRequest(context: any) {
+  const method = context.request.method.toUpperCase();
+  if (method === "OPTIONS") {
+    return onRequestOptions();
+  }
+  if (method === "POST") {
+    return onRequestPost(context);
+  }
+  return jsonResponse({ error: `Method ${method} not allowed on /api/payments/create-subscription. Expected POST.` }, 405);
 }
 
 export async function onRequestPost(context: any) {

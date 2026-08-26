@@ -8,8 +8,10 @@ import { onRequestGet as healthGet } from "./functions/api/health";
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
     const url = new URL(request.url);
-    const pathname = url.pathname.replace(/\/+$/, ""); // normalize trailing slash
+    const pathname = (url.pathname.replace(/\/+$/, "").toLowerCase()) || "/";
     const method = request.method.toUpperCase();
+
+    console.log(`[Cloudflare Worker] ${method} ${pathname}`);
 
     // CORS preflight handling
     if (method === "OPTIONS") {
@@ -26,12 +28,12 @@ export default {
 
     const context = { request, env, ctx, params: {} };
 
-    // Health check
+    // 1. Health check
     if (pathname === "/api/health") {
       return healthGet();
     }
 
-    // Razorpay Subscription Creation routes (supports both /payment/ and /payments/)
+    // 2. Razorpay Subscription Creation routes (supports both /payment/ and /payments/)
     if (
       pathname === "/api/payment/create-subscription" ||
       pathname === "/api/payments/create-subscription"
@@ -52,7 +54,7 @@ export default {
       );
     }
 
-    // Razorpay Subscription Verification routes (supports both /payment/ and /payments/)
+    // 3. Razorpay Subscription Verification routes (supports both /payment/ and /payments/)
     if (
       pathname === "/api/payment/verify-subscription" ||
       pathname === "/api/payments/verify-subscription"
@@ -73,7 +75,7 @@ export default {
       );
     }
 
-    // Razorpay Webhook routes
+    // 4. Razorpay Webhook routes
     if (
       pathname === "/api/payment/razorpay-webhook" ||
       pathname === "/api/payments/razorpay-webhook" ||
@@ -84,11 +86,11 @@ export default {
       }
       return new Response(JSON.stringify({ status: "ok" }), {
         status: 200,
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
       });
     }
 
-    // Subscription direct upgrade/cancel routes
+    // 5. Subscription direct upgrade/cancel routes
     if (pathname === "/api/subscription/upgrade") {
       if (method === "POST") {
         return upgradePost(context);
@@ -101,7 +103,7 @@ export default {
       }
     }
 
-    // Fallback for unmatched API routes
+    // 6. Fallback for unmatched API routes
     if (pathname.startsWith("/api/")) {
       return new Response(
         JSON.stringify({ error: `API endpoint ${pathname} not found` }),
@@ -115,11 +117,14 @@ export default {
       );
     }
 
-    // For static asset requests when deployed as Cloudflare Pages / Workers
+    // 7. For static asset requests when deployed as Cloudflare Pages / Workers
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
       return env.ASSETS.fetch(request);
     }
 
-    return new Response("Not Found", { status: 404 });
+    return new Response("Not Found", {
+      status: 404,
+      headers: { "Access-Control-Allow-Origin": "*" },
+    });
   },
 };

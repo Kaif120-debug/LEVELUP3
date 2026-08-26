@@ -1,9 +1,9 @@
-import { onRequestPost as createSubPost, onRequestOptions as createSubOptions } from "./functions/api/payment/create-subscription";
-import { onRequestPost as verifySubPost, onRequestOptions as verifySubOptions } from "./functions/api/payment/verify-subscription";
-import { onRequestPost as webhookPost } from "./functions/api/payment/razorpay-webhook";
-import { onRequestPost as upgradePost, onRequestOptions as upgradeOptions } from "./functions/api/subscription/upgrade";
-import { onRequestPost as cancelPost, onRequestOptions as cancelOptions } from "./functions/api/subscription/cancel";
-import { onRequestGet as healthGet } from "./functions/api/health";
+import { onRequestPost as createSubPost, onRequestOptions as createSubOptions } from "../functions/api/payment/create-subscription";
+import { onRequestPost as verifySubPost, onRequestOptions as verifySubOptions } from "../functions/api/payment/verify-subscription";
+import { onRequestPost as webhookPost } from "../functions/api/payment/razorpay-webhook";
+import { onRequestPost as upgradePost, onRequestOptions as upgradeOptions } from "../functions/api/subscription/upgrade";
+import { onRequestPost as cancelPost, onRequestOptions as cancelOptions } from "../functions/api/subscription/cancel";
+import { onRequestGet as healthGet } from "../functions/api/health";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
