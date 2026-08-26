@@ -6,7 +6,7 @@ function jsonResponse(data: any, status = 200) {
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With, x-razorpay-signature",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     },
   });
