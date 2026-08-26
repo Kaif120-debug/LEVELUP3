@@ -131,6 +131,7 @@ app.get("/api/health", (req, res) => {
 
 // 1. Create Razorpay Subscription Endpoint
 app.post("/api/payments/create-subscription", async (req, res) => {
+  console.log("[DEBUG create-sub received]", req.body);
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   const { userId, email, name } = req.body || {};
@@ -221,13 +222,21 @@ app.post("/api/payments/create-subscription", async (req, res) => {
         body: JSON.stringify(subPayload),
       });
 
-      const rzpSubData = await rzpSubRes.json();
+      const rzpRawText = await rzpSubRes.text();
+      let rzpSubData: any = null;
+      try {
+        if (rzpRawText) {
+          rzpSubData = JSON.parse(rzpRawText);
+        }
+      } catch {
+        rzpSubData = null;
+      }
 
       if (!rzpSubRes.ok || !rzpSubData?.id) {
-        console.error("[Razorpay Subscription API Error]", rzpSubData);
+        console.error("[Razorpay Subscription API Error]", rzpSubData || rzpRawText);
         return res.status(rzpSubRes.status || 400).json({
           success: false,
-          error: rzpSubData?.error?.description || "Failed to create Razorpay subscription",
+          error: rzpSubData?.error?.description || "Failed to create Razorpay subscription on gateway",
         });
       }
 

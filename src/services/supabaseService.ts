@@ -2614,7 +2614,13 @@ export async function upsertUserSubscription(
           });
 
           if (serverRes.ok) {
-            const resJson = await serverRes.json();
+            const raw = await serverRes.text();
+            let resJson: any = null;
+            try {
+              if (raw) resJson = JSON.parse(raw);
+            } catch {
+              resJson = null;
+            }
             if (resJson?.data) {
               const reloaded = await fetchUserSubscription(effectiveUserId);
               return { data: reloaded || mapDbSubscription(resJson.data), error: null };
@@ -2674,7 +2680,13 @@ export async function upsertUserSubscription(
         });
 
         if (serverRes.ok) {
-          const resJson = await serverRes.json();
+          const raw = await serverRes.text();
+          let resJson: any = null;
+          try {
+            if (raw) resJson = JSON.parse(raw);
+          } catch {
+            resJson = null;
+          }
           if (resJson?.data) {
             const reloaded = await fetchUserSubscription(effectiveUserId);
             return { data: reloaded || mapDbSubscription(resJson.data), error: null };

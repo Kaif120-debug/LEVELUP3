@@ -53,6 +53,59 @@ export interface RazorpayCheckoutOptions {
 }
 
 /**
+ * Safely executes a fetch request and parses JSON or returns a clean descriptive error
+ * without throwing "Unexpected end of JSON input".
+ */
+async function safeApiRequest<T = any>(
+  url: string,
+  options: RequestInit
+): Promise<{ ok: boolean; status: number; data: T | null; error?: string }> {
+  try {
+    const res = await fetch(url, options);
+    const rawText = await res.text();
+    let parsed: any = null;
+
+    if (rawText && rawText.trim()) {
+      try {
+        parsed = JSON.parse(rawText);
+      } catch {
+        parsed = null;
+      }
+    }
+
+    if (!res.ok) {
+      const serverErrMsg =
+        parsed?.error ||
+        parsed?.message ||
+        (res.status === 404
+          ? `API endpoint (${url}) was not found (404). Please ensure backend routes are deployed.`
+          : res.status === 500
+          ? `Server error (500) while processing payment request.`
+          : `Payment request failed with status ${res.status}`);
+      return { ok: false, status: res.status, data: parsed, error: serverErrMsg };
+    }
+
+    if (!parsed) {
+      return {
+        ok: false,
+        status: res.status,
+        data: null,
+        error: `Server returned an empty or invalid response from ${url}`,
+      };
+    }
+
+    return { ok: true, status: res.status, data: parsed };
+  } catch (netErr: any) {
+    return {
+      ok: false,
+      status: 0,
+      data: null,
+      error: netErr?.message || 'Network connection failed during payment request',
+    };
+  }
+}
+
+/**
  * Initiates Razorpay Test Mode Subscription Flow:
  * 1. Calls server POST /api/payments/create-subscription to get subscription_id & key_id
  * 2. Launches Razorpay modal with subscription_id
@@ -71,7 +124,17 @@ export async function startRazorpaySubscription({
     const token = sessionData?.session?.access_token;
 
     // 2. Request backend to create Razorpay subscription
-    const createRes = await fetch('/api/payments/create-subscription', {
+    const createResult = await safeApiRequest<{
+      success: boolean;
+      subscription_id: string;
+      key_id: string;
+      amount?: number;
+      currency?: string;
+      name?: string;
+      description?: string;
+      is_test_simulation?: boolean;
+      error?: string;
+    }>('/api/payments/create-subscription', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -84,10 +147,8 @@ export async function startRazorpaySubscription({
       }),
     });
 
-    const createData = await createRes.json();
-
-    if (!createRes.ok || !createData.success) {
-      throw new Error(createData.error || 'Failed to create Razorpay subscription session');
+    if (!createResult.ok || !createResult.data?.success) {
+      throw new Error(createResult.error || createResult.data?.error || 'Failed to create Razorpay subscription session');
     }
 
     const {
@@ -98,13 +159,17 @@ export async function startRazorpaySubscription({
       name = 'LEVELUP',
       description = 'LEVELUP PRO Subscription (₹129/month)',
       is_test_simulation = false,
-    } = createData;
+    } = createResult.data;
 
     // 3. If in test simulation mode (e.g. Razorpay keys not yet set in environment)
     if (is_test_simulation) {
       console.info('[Razorpay Test Mode] Simulating test payment completion...');
-      
-      const verifyRes = await fetch('/api/payments/verify-subscription', {
+
+      const verifyResult = await safeApiRequest<{
+        success: boolean;
+        data: DbSubscription;
+        error?: string;
+      }>('/api/payments/verify-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,12 +184,11 @@ export async function startRazorpaySubscription({
         }),
       });
 
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok || !verifyData.success) {
-        throw new Error(verifyData.error || 'Failed to verify simulated subscription');
+      if (!verifyResult.ok || !verifyResult.data?.success || !verifyResult.data?.data) {
+        throw new Error(verifyResult.error || verifyResult.data?.error || 'Failed to verify simulated subscription');
       }
 
-      onSuccess(verifyData.data);
+      onSuccess(verifyResult.data.data);
       return;
     }
 
@@ -165,7 +229,11 @@ export async function startRazorpaySubscription({
       }) => {
         try {
           // 6. Verify signature on backend
-          const verifyRes = await fetch('/api/payments/verify-subscription', {
+          const verifyResult = await safeApiRequest<{
+            success: boolean;
+            data: DbSubscription;
+            error?: string;
+          }>('/api/payments/verify-subscription', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -179,12 +247,11 @@ export async function startRazorpaySubscription({
             }),
           });
 
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok || !verifyData.success) {
-            throw new Error(verifyData.error || 'Razorpay subscription signature verification failed');
+          if (!verifyResult.ok || !verifyResult.data?.success || !verifyResult.data?.data) {
+            throw new Error(verifyResult.error || verifyResult.data?.error || 'Razorpay subscription signature verification failed');
           }
 
-          onSuccess(verifyData.data);
+          onSuccess(verifyResult.data.data);
         } catch (verifyErr: any) {
           console.error('[Razorpay Verification Error]', verifyErr);
           onError(verifyErr.message || 'Verification failed after payment');
