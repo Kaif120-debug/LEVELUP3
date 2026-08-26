@@ -117,78 +117,69 @@ export async function onRequestPost(context: any) {
     const razorpayKeySecret = (env.RAZORPAY_KEY_SECRET || "").trim();
     const razorpayPlanId = (env.RAZORPAY_PLAN_ID || "").trim();
 
-    // If Razorpay API keys are configured, make call to Razorpay Subscriptions API
-    if (razorpayKeyId && razorpayKeySecret) {
-      if (!razorpayPlanId) {
-        return jsonResponse({
-          success: false,
-          error: "RAZORPAY_PLAN_ID is not configured in Cloudflare environment variables.",
-        }, 400);
-      }
-
-      const authHeaderBasic = "Basic " + btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
-
-      const subPayload = {
-        plan_id: razorpayPlanId,
-        total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
-        quantity: 1,
-        customer_notify: 1,
-        notes: {
-          user_id: effectiveUserId,
-          email: userEmail || "",
-          name: name || "",
-        },
-      };
-
-      const rzpSubRes = await fetch("https://api.razorpay.com/v1/subscriptions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeaderBasic,
-        },
-        body: JSON.stringify(subPayload),
-      });
-
-      const rzpRawText = await rzpSubRes.text();
-      let rzpSubData: any = null;
-      try {
-        if (rzpRawText) {
-          rzpSubData = JSON.parse(rzpRawText);
-        }
-      } catch {
-        rzpSubData = null;
-      }
-
-      if (!rzpSubRes.ok || !rzpSubData?.id) {
-        console.error("[Cloudflare Razorpay Subscription Error]", rzpSubData || rzpRawText);
-        return jsonResponse({
-          success: false,
-          error: rzpSubData?.error?.description || "Failed to create Razorpay subscription on gateway",
-        }, rzpSubRes.status || 400);
-      }
-
+    if (!razorpayKeyId || !razorpayKeySecret) {
       return jsonResponse({
-        success: true,
-        subscription_id: rzpSubData.id,
-        key_id: razorpayKeyId,
-        plan_id: razorpayPlanId,
-        currency: "INR",
-        name: "LEVELUP",
-        description: "LEVELUP PRO Subscription (₹129/month)",
-      }, 200);
+        success: false,
+        error: "Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are not configured in Worker environment variables.",
+      }, 500);
     }
 
-    // Graceful test simulation mode (e.g. preview environment without live Razorpay keys)
-    const simulatedSubId = `sub_test_${Date.now()}`;
+    if (!razorpayPlanId) {
+      return jsonResponse({
+        success: false,
+        error: "RAZORPAY_PLAN_ID is not configured in Cloudflare environment variables.",
+      }, 500);
+    }
+
+    const authHeaderBasic = "Basic " + btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
+
+    const subPayload = {
+      plan_id: razorpayPlanId,
+      total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
+      quantity: 1,
+      customer_notify: 1,
+      notes: {
+        user_id: effectiveUserId,
+        email: userEmail || "",
+        name: name || "",
+      },
+    };
+
+    const rzpSubRes = await fetch("https://api.razorpay.com/v1/subscriptions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeaderBasic,
+      },
+      body: JSON.stringify(subPayload),
+    });
+
+    const rzpRawText = await rzpSubRes.text();
+    let rzpSubData: any = null;
+    try {
+      if (rzpRawText) {
+        rzpSubData = JSON.parse(rzpRawText);
+      }
+    } catch {
+      rzpSubData = null;
+    }
+
+    if (!rzpSubRes.ok || !rzpSubData?.id) {
+      console.error("[Cloudflare Razorpay Subscription Error]", rzpSubData || rzpRawText);
+      return jsonResponse({
+        success: false,
+        error: rzpSubData?.error?.description || "Failed to create Razorpay subscription on gateway",
+      }, rzpSubRes.status || 400);
+    }
+
     return jsonResponse({
       success: true,
-      subscription_id: simulatedSubId,
-      key_id: razorpayKeyId || "rzp_test_simulation",
-      amount: 12900,
+      subscription_id: rzpSubData.id,
+      key_id: razorpayKeyId,
+      plan_id: razorpayPlanId,
       currency: "INR",
       name: "LEVELUP",
       description: "LEVELUP PRO Subscription (₹129/month)",
-      is_test_simulation: true,
     }, 200);
   } catch (err: any) {
     console.error("[Cloudflare Create Subscription Exception]", err);
