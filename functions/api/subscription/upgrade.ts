@@ -23,6 +23,17 @@ export async function onRequestOptions() {
   });
 }
 
+export async function onRequest(context: any) {
+  const method = context.request.method.toUpperCase();
+  if (method === "OPTIONS") {
+    return onRequestOptions();
+  }
+  if (method === "POST") {
+    return onRequestPost(context);
+  }
+  return jsonResponse({ error: `Method ${method} not allowed. Expected POST.` }, 405);
+}
+
 export async function onRequestPost(context: any) {
   const { request, env } = context;
 

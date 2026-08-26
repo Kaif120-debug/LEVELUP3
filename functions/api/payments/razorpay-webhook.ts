@@ -31,6 +31,24 @@ async function verifyHmacSha256(secret: string, message: string, expectedHex: st
   }
 }
 
+export async function onRequest(context: any) {
+  const method = context.request.method.toUpperCase();
+  if (method === "OPTIONS") {
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization, x-razorpay-signature",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      },
+    });
+  }
+  if (method === "POST") {
+    return onRequestPost(context);
+  }
+  return jsonResponse({ status: "ok" }, 200);
+}
+
 export async function onRequestPost(context: any) {
   const { request, env } = context;
 
