@@ -123,8 +123,8 @@ export async function startRazorpaySubscription({
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
-    // 2. Request backend to create Razorpay subscription
-    const createResult = await safeApiRequest<{
+    // 2. Request backend to create Razorpay subscription (tries /api/payment/create-subscription first)
+    let createResult = await safeApiRequest<{
       success: boolean;
       subscription_id: string;
       key_id: string;
@@ -134,7 +134,7 @@ export async function startRazorpaySubscription({
       description?: string;
       is_test_simulation?: boolean;
       error?: string;
-    }>('/api/payments/create-subscription', {
+    }>('/api/payment/create-subscription', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -146,6 +146,32 @@ export async function startRazorpaySubscription({
         name: user.user_metadata?.full_name || '',
       }),
     });
+
+    if (!createResult.ok && createResult.status === 404) {
+      // Fallback to /api/payments/create-subscription if needed
+      createResult = await safeApiRequest<{
+        success: boolean;
+        subscription_id: string;
+        key_id: string;
+        amount?: number;
+        currency?: string;
+        name?: string;
+        description?: string;
+        is_test_simulation?: boolean;
+        error?: string;
+      }>('/api/payments/create-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email,
+          name: user.user_metadata?.full_name || '',
+        }),
+      });
+    }
 
     if (!createResult.ok || !createResult.data?.success) {
       throw new Error(createResult.error || createResult.data?.error || 'Failed to create Razorpay subscription session');
@@ -165,11 +191,11 @@ export async function startRazorpaySubscription({
     if (is_test_simulation) {
       console.info('[Razorpay Test Mode] Simulating test payment completion...');
 
-      const verifyResult = await safeApiRequest<{
+      let verifyResult = await safeApiRequest<{
         success: boolean;
         data: DbSubscription;
         error?: string;
-      }>('/api/payments/verify-subscription', {
+      }>('/api/payment/verify-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -183,6 +209,27 @@ export async function startRazorpaySubscription({
           is_simulation: true,
         }),
       });
+
+      if (!verifyResult.ok && verifyResult.status === 404) {
+        verifyResult = await safeApiRequest<{
+          success: boolean;
+          data: DbSubscription;
+          error?: string;
+        }>('/api/payments/verify-subscription', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({
+            userId: user.id,
+            razorpay_payment_id: `pay_sim_${Date.now()}`,
+            razorpay_subscription_id: subscription_id,
+            razorpay_signature: `sig_sim_${Date.now()}`,
+            is_simulation: true,
+          }),
+        });
+      }
 
       if (!verifyResult.ok || !verifyResult.data?.success || !verifyResult.data?.data) {
         throw new Error(verifyResult.error || verifyResult.data?.error || 'Failed to verify simulated subscription');
@@ -229,11 +276,11 @@ export async function startRazorpaySubscription({
       }) => {
         try {
           // 6. Verify signature on backend
-          const verifyResult = await safeApiRequest<{
+          let verifyResult = await safeApiRequest<{
             success: boolean;
             data: DbSubscription;
             error?: string;
-          }>('/api/payments/verify-subscription', {
+          }>('/api/payment/verify-subscription', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -246,6 +293,26 @@ export async function startRazorpaySubscription({
               razorpay_signature: response.razorpay_signature,
             }),
           });
+
+          if (!verifyResult.ok && verifyResult.status === 404) {
+            verifyResult = await safeApiRequest<{
+              success: boolean;
+              data: DbSubscription;
+              error?: string;
+            }>('/api/payments/verify-subscription', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+              body: JSON.stringify({
+                userId: user.id,
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_subscription_id: response.razorpay_subscription_id,
+                razorpay_signature: response.razorpay_signature,
+              }),
+            });
+          }
 
           if (!verifyResult.ok || !verifyResult.data?.success || !verifyResult.data?.data) {
             throw new Error(verifyResult.error || verifyResult.data?.error || 'Razorpay subscription signature verification failed');

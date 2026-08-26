@@ -11,6 +11,17 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
+// CORS headers for all API requests
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept, Authorization, x-razorpay-signature");
+  res.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(
   express.json({
     verify: (req: any, _res, buf) => {
@@ -130,7 +141,7 @@ app.get("/api/health", (req, res) => {
 // ==========================================
 
 // 1. Create Razorpay Subscription Endpoint
-app.post("/api/payments/create-subscription", async (req, res) => {
+app.post(["/api/payment/create-subscription", "/api/payments/create-subscription"], async (req, res) => {
   console.log("[DEBUG create-sub received]", req.body);
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
@@ -270,7 +281,7 @@ app.post("/api/payments/create-subscription", async (req, res) => {
 });
 
 // 2. Verify Razorpay Subscription Endpoint
-app.post("/api/payments/verify-subscription", async (req, res) => {
+app.post(["/api/payment/verify-subscription", "/api/payments/verify-subscription"], async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
   const { userId, razorpay_payment_id, razorpay_subscription_id, razorpay_signature, is_simulation } = req.body || {};
@@ -415,7 +426,7 @@ app.post("/api/payments/verify-subscription", async (req, res) => {
 });
 
 // 3. Razorpay Webhook Lifecycle Endpoint
-app.post("/api/payments/razorpay-webhook", async (req: any, res) => {
+app.post(["/api/payment/razorpay-webhook", "/api/payments/razorpay-webhook", "/api/payment/webhook"], async (req: any, res) => {
   try {
     const webhookSecret = (process.env.RAZORPAY_WEBHOOK_SECRET || process.env.RAZORPAY_KEY_SECRET || "").trim();
     const signature = req.headers["x-razorpay-signature"] as string;
