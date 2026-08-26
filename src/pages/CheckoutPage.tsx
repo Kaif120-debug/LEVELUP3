@@ -318,30 +318,46 @@ WITH CHECK (auth.uid() = user_id);`;
                 {/* Error Banner */}
                 {errorMessage && (
                   <div className="p-4 rounded-2xl bg-error-container/40 border border-error/40 text-on-error-container text-xs space-y-2 animate-in fade-in">
-                    <div className="flex items-center gap-2 font-bold text-error">
-                      <span className="material-symbols-outlined text-base">error</span>
-                      Subscription Write Blocked (RLS Policy Missing)
-                    </div>
-                    <p className="text-[11px] text-on-error-container opacity-90 leading-relaxed">
-                      PostgreSQL Row Level Security (RLS) requires an INSERT/UPDATE policy on table <code className="bg-surface/50 px-1 py-0.5 rounded font-mono">public.subscriptions</code>.
-                    </p>
-                    <div className="p-2.5 rounded-xl bg-surface/80 border border-outline-variant font-mono text-[10.5px] text-on-surface overflow-x-auto space-y-2">
-                      <div className="flex items-center justify-between gap-2 border-b border-outline-variant pb-1.5">
-                        <span className="font-bold text-[10px] uppercase text-on-surface-variant font-sans">Run in Supabase SQL Editor</span>
-                        <button
-                          type="button"
-                          onClick={handleCopySql}
-                          className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-primary text-on-primary hover:bg-primary/90 transition-colors flex items-center gap-1 cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[12px]">{copiedSql ? 'check' : 'content_copy'}</span>
-                          {copiedSql ? 'Copied!' : 'Copy SQL'}
-                        </button>
+                    {/row-level security|rls|policy|42501/i.test(errorMessage) ? (
+                      <>
+                        <div className="flex items-center gap-2 font-bold text-error">
+                          <span className="material-symbols-outlined text-base">error</span>
+                          Subscription Write Blocked (RLS Policy Missing)
+                        </div>
+                        <p className="text-[11px] text-on-error-container opacity-90 leading-relaxed">
+                          PostgreSQL Row Level Security (RLS) requires an INSERT/UPDATE policy on table <code className="bg-surface/50 px-1 py-0.5 rounded font-mono">public.subscriptions</code>.
+                        </p>
+                        <div className="p-2.5 rounded-xl bg-surface/80 border border-outline-variant font-mono text-[10.5px] text-on-surface overflow-x-auto space-y-2">
+                          <div className="flex items-center justify-between gap-2 border-b border-outline-variant pb-1.5">
+                            <span className="font-bold text-[10px] uppercase text-on-surface-variant font-sans">Run in Supabase SQL Editor</span>
+                            <button
+                              type="button"
+                              onClick={handleCopySql}
+                              className="px-2 py-0.5 text-[10px] font-bold rounded-md bg-primary text-on-primary hover:bg-primary/90 transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[12px]">{copiedSql ? 'check' : 'content_copy'}</span>
+                              {copiedSql ? 'Copied!' : 'Copy SQL'}
+                            </button>
+                          </div>
+                          <pre className="whitespace-pre-wrap">{rlsFixSql}</pre>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-start gap-2 text-error">
+                        <span className="material-symbols-outlined text-base mt-0.5 shrink-0">info</span>
+                        <div>
+                          <div className="font-bold">Checkout Action Required</div>
+                          <p className="text-[11px] text-on-error-container opacity-90 mt-0.5 leading-relaxed">
+                            {errorMessage}
+                          </p>
+                        </div>
                       </div>
-                      <pre className="whitespace-pre-wrap">{rlsFixSql}</pre>
-                    </div>
-                    <pre className="font-mono text-[10px] whitespace-pre-wrap break-all opacity-80 pt-1 border-t border-error/20">
-                      {errorMessage}
-                    </pre>
+                    )}
+                    {/row-level security|rls|policy|42501/i.test(errorMessage) && (
+                      <pre className="font-mono text-[10px] whitespace-pre-wrap break-all opacity-80 pt-1 border-t border-error/20">
+                        {errorMessage}
+                      </pre>
+                    )}
                   </div>
                 )}
 

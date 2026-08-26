@@ -322,7 +322,7 @@ app.post("/api/payments/verify-subscription", async (req, res) => {
     let resultData = null;
 
     if (existing?.id || existing?.user_id) {
-      const { data: updated, error: updateErr } = await client
+      let { data: updated, error: updateErr } = await client
         .from("subscriptions")
         .update({
           plan: "pro",
@@ -336,13 +336,28 @@ app.post("/api/payments/verify-subscription", async (req, res) => {
         .select()
         .maybeSingle();
 
+      // If update failed due to unknown extended columns, retry with minimal standard columns
       if (updateErr) {
-        console.error("[Supabase Subscriptions Update Error]", updateErr);
-        return res.status(400).json({ success: false, error: updateErr.message });
+        console.warn("[Supabase Subscriptions Extended Update note]:", updateErr.message, "Retrying with standard columns...");
+        const retryRes = await client
+          .from("subscriptions")
+          .update({
+            plan: "pro",
+            status: "active",
+          })
+          .eq("user_id", effectiveUserId)
+          .select()
+          .maybeSingle();
+        
+        if (retryRes.error) {
+          console.error("[Supabase Subscriptions Update Error]", retryRes.error);
+          return res.status(400).json({ success: false, error: retryRes.error.message });
+        }
+        updated = retryRes.data;
       }
       resultData = updated;
     } else {
-      const { data: inserted, error: insertErr } = await client
+      let { data: inserted, error: insertErr } = await client
         .from("subscriptions")
         .insert({
           user_id: effectiveUserId,
@@ -356,9 +371,25 @@ app.post("/api/payments/verify-subscription", async (req, res) => {
         .select()
         .maybeSingle();
 
+      // If insert failed due to unknown extended columns, retry with minimal standard columns
       if (insertErr) {
-        console.error("[Supabase Subscriptions Insert Error]", insertErr);
-        return res.status(400).json({ success: false, error: insertErr.message });
+        console.warn("[Supabase Subscriptions Extended Insert note]:", insertErr.message, "Retrying with standard columns...");
+        const retryRes = await client
+          .from("subscriptions")
+          .insert({
+            user_id: effectiveUserId,
+            plan: "pro",
+            status: "active",
+            started_at: today,
+          })
+          .select()
+          .maybeSingle();
+
+        if (retryRes.error) {
+          console.error("[Supabase Subscriptions Insert Error]", retryRes.error);
+          return res.status(400).json({ success: false, error: retryRes.error.message });
+        }
+        inserted = retryRes.data;
       }
       resultData = inserted;
     }
