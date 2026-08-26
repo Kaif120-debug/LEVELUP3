@@ -1,0 +1,6 @@
+{
+  "name": "LEVELUP",
+  "description": "An intelligent all-in-one SaaS workspace for fitness, career, daily planning, academics, and creator growth.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
