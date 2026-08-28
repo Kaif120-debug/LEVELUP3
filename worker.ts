@@ -4,6 +4,7 @@ import { onRequestPost as webhookPost } from "./functions/api/payment/razorpay-w
 import { onRequestPost as upgradePost, onRequestOptions as upgradeOptions } from "./functions/api/subscription/upgrade";
 import { onRequestPost as cancelPost, onRequestOptions as cancelOptions } from "./functions/api/subscription/cancel";
 import { onRequestGet as healthGet } from "./functions/api/health";
+import { onRequestGet as configGet, onRequestOptions as configOptions } from "./functions/api/config";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
@@ -28,9 +29,16 @@ export default {
 
     const context = { request, env, ctx, params: {} };
 
-    // 1. Health check
+    // 1. Health check & Public configuration
     if (pathname === "/api/health") {
       return healthGet();
+    }
+
+    if (pathname === "/api/config" || pathname === "/api/public-config") {
+      if (method === "OPTIONS") {
+        return configOptions();
+      }
+      return configGet(context);
     }
 
     // 2. Razorpay Subscription Creation routes (supports both /payment/ and /payments/)

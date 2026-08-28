@@ -136,6 +136,23 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
+// Public frontend configuration endpoint (safe public variables only)
+app.get(["/api/config", "/api/public-config"], (req, res) => {
+  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+  const supabaseAnonKey = (
+    process.env.SUPABASE_ANON_KEY ||
+    process.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+    process.env.VITE_SUPABASE_ANON_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    ""
+  ).trim();
+
+  res.json({
+    supabaseUrl,
+    supabaseAnonKey,
+  });
+});
+
 // ==========================================
 // RAZORPAY PAYMENT & SUBSCRIPTIONS ENDPOINTS
 // ==========================================

@@ -64,6 +64,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
+      if (!isSupabaseConfigured) {
+        return {
+          data: null,
+          error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
+        };
+      }
       const emailRedirectTo = getAuthRedirectUrl('/onboarding');
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -83,6 +89,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      if (!isSupabaseConfigured) {
+        return {
+          data: null,
+          error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
+        };
+      }
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -98,7 +110,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!isSupabaseConfigured) {
         return {
           data: null,
-          error: new Error('Supabase authentication is not fully configured yet with VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY.'),
+          error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
         };
       }
       const redirectTo = getAuthRedirectUrl('/dashboard');
@@ -122,10 +134,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      const { error } = await supabase.auth.signOut();
+      if (isSupabaseConfigured) {
+        const { error } = await supabase.auth.signOut();
+        setUser(null);
+        setSession(null);
+        return { error };
+      }
       setUser(null);
       setSession(null);
-      return { error };
+      return { error: null };
     } catch (err: any) {
       setUser(null);
       setSession(null);
@@ -135,6 +152,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string) => {
     try {
+      if (!isSupabaseConfigured) {
+        return {
+          data: null,
+          error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
+        };
+      }
       const redirectTo = getAuthRedirectUrl('/update-password');
       const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo,
@@ -147,6 +170,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePassword = async (newPassword: string) => {
     try {
+      if (!isSupabaseConfigured) {
+        return {
+          data: null,
+          error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
+        };
+      }
       const { data, error } = await supabase.auth.updateUser({
         password: newPassword,
       });

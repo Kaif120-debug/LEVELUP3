@@ -1,20 +1,23 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-const rawUrl = (import.meta.env.VITE_SUPABASE_URL || '').trim();
-const rawKey = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY ||
-  ''
-).trim();
+function cleanEnvString(raw?: string | null): string {
+  if (!raw) return '';
+  let s = raw.trim();
+  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
+    s = s.slice(1, -1).trim();
+  }
+  return s;
+}
 
 /**
  * Normalizes and sanitizes Supabase project URLs.
  * Handles cases where a user pastes their project dashboard link
- * (e.g., https://supabase.com/dashboard/project/xyz) instead of the API endpoint.
+ * (e.g., https://supabase.com/dashboard/project/xyz) or project ID instead of the API endpoint.
  */
 export function formatSupabaseUrl(raw: string): string {
-  if (!raw) return '';
-  let url = raw.trim();
+  const clean = cleanEnvString(raw);
+  if (!clean) return '';
+  let url = clean;
 
   // If user pasted dashboard URL like https://supabase.com/dashboard/project/abcxyz
   const dashboardMatch = url.match(/supabase\.com\/dashboard\/project\/([a-zA-Z0-9_-]+)/);
@@ -22,8 +25,8 @@ export function formatSupabaseUrl(raw: string): string {
     return `https://${dashboardMatch[1]}.supabase.co`;
   }
 
-  // If user passed just the 20-character project ref
-  if (/^[a-zA-Z0-9_-]{20}$/.test(url)) {
+  // If user passed just the project ref (e.g. 20-character identifier)
+  if (/^[a-zA-Z0-9_-]{15,35}$/.test(url)) {
     return `https://${url}.supabase.co`;
   }
 
@@ -38,14 +41,44 @@ export function formatSupabaseUrl(raw: string): string {
   return url;
 }
 
-export const supabaseUrl = formatSupabaseUrl(rawUrl);
-export const supabaseKey = rawKey;
+export function isPlaceholderConfig(url: string, key: string): boolean {
+  if (!url || !key) return true;
+  const lowerUrl = url.toLowerCase();
+  const lowerKey = key.toLowerCase();
 
-export const isSupabaseConfigured = Boolean(
+  return (
+    lowerUrl.includes('placeholder') ||
+    lowerUrl.includes('your-project') ||
+    lowerUrl.includes('example.com') ||
+    lowerUrl === 'https://' ||
+    lowerUrl === 'http://' ||
+    lowerKey.includes('placeholder') ||
+    lowerKey.includes('your-anon-key') ||
+    lowerKey.includes('your-key')
+  );
+}
+
+// Initial environment variable extraction from Vite build
+const initialRawUrl = (
+  import.meta.env.VITE_SUPABASE_URL ||
+  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_SUPABASE_URL) ||
+  ''
+);
+
+const initialRawKey = (
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_SUPABASE_ANON_KEY) ||
+  ''
+);
+
+export let supabaseUrl = formatSupabaseUrl(initialRawUrl);
+export let supabaseKey = cleanEnvString(initialRawKey);
+
+export let isSupabaseConfigured = Boolean(
   supabaseUrl &&
   supabaseKey &&
-  supabaseUrl.startsWith('https://') &&
-  supabaseUrl.includes('.supabase.co')
+  !isPlaceholderConfig(supabaseUrl, supabaseKey)
 );
 
 /**
@@ -54,12 +87,11 @@ export const isSupabaseConfigured = Boolean(
  * In development and AI Studio preview, dynamically uses window.location.origin.
  */
 export function getAppBaseUrl(): string {
-  // 1. Check for configured production site URL via environment variables
-  const configuredUrl = (
+  const configuredUrl = cleanEnvString(
     import.meta.env.VITE_SITE_URL ||
     import.meta.env.VITE_APP_URL ||
     ''
-  ).trim();
+  );
 
   if (configuredUrl) {
     let clean = configuredUrl.replace(/\/+$/, '');
@@ -69,7 +101,6 @@ export function getAppBaseUrl(): string {
     return clean;
   }
 
-  // 2. Fall back to current window origin dynamically
   if (typeof window !== 'undefined' && window.location && window.location.origin) {
     return window.location.origin;
   }
@@ -86,16 +117,53 @@ export function getAuthRedirectUrl(path: string = ''): string {
   return `${base}${cleanPath}`;
 }
 
-export const supabase: SupabaseClient = createClient(
-  supabaseUrl || 'https://placeholder-project.supabase.co',
-  supabaseKey || 'placeholder-anon-key',
-  {
+// Instantiate internal Supabase Client
+function createSupabaseInstance(url: string, key: string): SupabaseClient {
+  const validUrl = (url && !isPlaceholderConfig(url, key)) ? url : 'https://placeholder-project.supabase.co';
+  const validKey = (key && !isPlaceholderConfig(url, key)) ? key : 'placeholder-anon-key';
+
+  return createClient(validUrl, validKey, {
     auth: {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
     },
-  }
-);
+  });
+}
 
+let activeSupabaseClient: SupabaseClient = createSupabaseInstance(supabaseUrl, supabaseKey);
 
+// Dynamic proxy so all existing imports `import { supabase } from '../lib/supabase'` stay reactive
+export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
+  get(_target, prop) {
+    return (activeSupabaseClient as any)[prop];
+  },
+});
+
+// Runtime configuration hydration: If Vite build did not have VITE_SUPABASE_URL baked in,
+// fetch safe public config from backend /api/config (supported on Cloudflare Worker & Express)
+if (typeof window !== 'undefined') {
+  (async () => {
+    try {
+      if (!isSupabaseConfigured) {
+        const res = await fetch('/api/config');
+        if (res.ok) {
+          const config = await res.json();
+          if (config?.supabaseUrl && config?.supabaseAnonKey) {
+            const formatted = formatSupabaseUrl(config.supabaseUrl);
+            const key = cleanEnvString(config.supabaseAnonKey);
+            if (formatted && key && !isPlaceholderConfig(formatted, key)) {
+              supabaseUrl = formatted;
+              supabaseKey = key;
+              isSupabaseConfigured = true;
+              activeSupabaseClient = createSupabaseInstance(formatted, key);
+              console.log('[Supabase] Initialized with runtime configuration from /api/config');
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Non-blocking background fetch
+    }
+  })();
+}
