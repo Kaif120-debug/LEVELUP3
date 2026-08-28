@@ -113,7 +113,7 @@ export async function onRequestPost(context: any) {
       }
     }
 
-    const razorpayKeyId = (env.RAZORPAY_KEY_ID || env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const razorpayKeyId = (env.RAZORPAY_KEY_ID || "").trim();
     const razorpayKeySecret = (env.RAZORPAY_KEY_SECRET || "").trim();
     const razorpayPlanId = (env.RAZORPAY_PLAN_ID || "").trim();
 

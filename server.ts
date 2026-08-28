@@ -194,7 +194,7 @@ app.post(["/api/payment/create-subscription", "/api/payments/create-subscription
       }
     }
 
-    const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || "").trim();
     const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
     const razorpayPlanId = (process.env.RAZORPAY_PLAN_ID || "").trim();
 
