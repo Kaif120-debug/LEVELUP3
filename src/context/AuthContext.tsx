@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase, isSupabaseConfigured, getAuthRedirectUrl } from '../lib/supabase';
+import { supabase, getIsSupabaseConfigured, onSupabaseConfigChange, getAuthRedirectUrl } from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -21,6 +21,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [isConfigured, setIsConfigured] = useState(getIsSupabaseConfigured());
 
   useEffect(() => {
     let mounted = true;
@@ -56,15 +57,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    // Listen for runtime configuration changes (e.g. from /api/config)
+    const unsubscribeConfig = onSupabaseConfigChange((configured) => {
+      if (mounted) {
+        setIsConfigured(configured);
+        initAuth();
+      }
+    });
+
     return () => {
       mounted = false;
       subscription.unsubscribe();
+      unsubscribeConfig();
     };
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         return {
           data: null,
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
@@ -89,7 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         return {
           data: null,
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
@@ -107,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         return {
           data: null,
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
@@ -134,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
-      if (isSupabaseConfigured) {
+      if (getIsSupabaseConfigured()) {
         const { error } = await supabase.auth.signOut();
         setUser(null);
         setSession(null);
@@ -152,7 +162,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string) => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         return {
           data: null,
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
@@ -170,7 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePassword = async (newPassword: string) => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         return {
           data: null,
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
@@ -191,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user,
         session,
         isAuthLoading,
-        isConfigured: isSupabaseConfigured,
+        isConfigured,
         signUp,
         signIn,
         signInWithGoogle,

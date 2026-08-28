@@ -59,15 +59,16 @@ export function isPlaceholderConfig(url: string, key: string): boolean {
 }
 
 // Initial environment variable extraction from Vite build
-const initialRawUrl = (
+// Uses import.meta.env.VITE_SUPABASE_URL and import.meta.env.VITE_SUPABASE_ANON_KEY
+const initialRawUrl = cleanEnvString(
   import.meta.env.VITE_SUPABASE_URL ||
   (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_SUPABASE_URL) ||
   ''
 );
 
-const initialRawKey = (
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+const initialRawKey = cleanEnvString(
   import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
   (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_SUPABASE_ANON_KEY) ||
   ''
 );
@@ -75,11 +76,15 @@ const initialRawKey = (
 export let supabaseUrl = formatSupabaseUrl(initialRawUrl);
 export let supabaseKey = cleanEnvString(initialRawKey);
 
-export let isSupabaseConfigured = Boolean(
-  supabaseUrl &&
-  supabaseKey &&
-  !isPlaceholderConfig(supabaseUrl, supabaseKey)
-);
+export function getIsSupabaseConfigured(): boolean {
+  return Boolean(
+    supabaseUrl &&
+    supabaseKey &&
+    !isPlaceholderConfig(supabaseUrl, supabaseKey)
+  );
+}
+
+export let isSupabaseConfigured = getIsSupabaseConfigured();
 
 /**
  * Resolves the base application URL for auth redirects (email confirmation, OAuth, password reset).
@@ -133,6 +138,16 @@ function createSupabaseInstance(url: string, key: string): SupabaseClient {
 
 let activeSupabaseClient: SupabaseClient = createSupabaseInstance(supabaseUrl, supabaseKey);
 
+const configListeners: Array<(configured: boolean) => void> = [];
+
+export function onSupabaseConfigChange(listener: (configured: boolean) => void): () => void {
+  configListeners.push(listener);
+  return () => {
+    const idx = configListeners.indexOf(listener);
+    if (idx !== -1) configListeners.splice(idx, 1);
+  };
+}
+
 // Dynamic proxy so all existing imports `import { supabase } from '../lib/supabase'` stay reactive
 export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   get(_target, prop) {
@@ -140,12 +155,12 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   },
 });
 
-// Runtime configuration hydration: If Vite build did not have VITE_SUPABASE_URL baked in,
+// Runtime configuration hydration: If Vite build did not have VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY baked in,
 // fetch safe public config from backend /api/config (supported on Cloudflare Worker & Express)
 if (typeof window !== 'undefined') {
   (async () => {
     try {
-      if (!isSupabaseConfigured) {
+      if (!getIsSupabaseConfigured()) {
         const res = await fetch('/api/config');
         if (res.ok) {
           const config = await res.json();
@@ -158,6 +173,7 @@ if (typeof window !== 'undefined') {
               isSupabaseConfigured = true;
               activeSupabaseClient = createSupabaseInstance(formatted, key);
               console.log('[Supabase] Initialized with runtime configuration from /api/config');
+              configListeners.forEach((fn) => fn(true));
             }
           }
         }

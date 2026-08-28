@@ -336,7 +336,7 @@ export const SettingsModal: React.FC = () => {
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
                   {isSupabaseConfigured
                     ? 'Your frontend is fully configured with Supabase. All workout plans, nutrition data, tasks, invoices, student courses, and subscriptions are synchronized.'
-                    : 'Supabase credentials can be configured via environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY). All local features remain fully functional.'}
+                    : 'Supabase credentials can be configured via environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY). All local features remain fully functional.'}
                 </p>
               </div>
             </div>

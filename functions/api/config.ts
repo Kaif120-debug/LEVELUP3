@@ -4,11 +4,15 @@
 
 export async function onRequestGet(context: { env: any }): Promise<Response> {
   const env = context.env || {};
-  const supabaseUrl = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
+  const supabaseUrl = (
+    env.VITE_SUPABASE_URL ||
+    env.SUPABASE_URL ||
+    ""
+  ).trim();
   const supabaseAnonKey = (
+    env.VITE_SUPABASE_ANON_KEY ||
     env.SUPABASE_ANON_KEY ||
     env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-    env.VITE_SUPABASE_ANON_KEY ||
     env.SUPABASE_PUBLISHABLE_KEY ||
     ""
   ).trim();
