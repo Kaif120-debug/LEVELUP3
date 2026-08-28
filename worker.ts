@@ -119,7 +119,13 @@ export default {
 
     // 7. For static asset requests when deployed as Cloudflare Pages / Workers
     if (env.ASSETS && typeof env.ASSETS.fetch === "function") {
-      return env.ASSETS.fetch(request);
+      const assetRes = await env.ASSETS.fetch(request);
+      if (assetRes.status === 404 && request.method === "GET" && !pathname.startsWith("/api/")) {
+        const urlClone = new URL(request.url);
+        urlClone.pathname = "/index.html";
+        return env.ASSETS.fetch(new Request(urlClone.toString(), request));
+      }
+      return assetRes;
     }
 
     return new Response("Not Found", {

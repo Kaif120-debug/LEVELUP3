@@ -87,8 +87,8 @@ export function getAuthRedirectUrl(path: string = ''): string {
 }
 
 export const supabase: SupabaseClient = createClient(
-  supabaseUrl,
-  supabaseKey,
+  supabaseUrl || 'https://placeholder-project.supabase.co',
+  supabaseKey || 'placeholder-anon-key',
   {
     auth: {
       persistSession: true,
