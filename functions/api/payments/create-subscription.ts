@@ -166,9 +166,11 @@ export async function onRequestPost(context: any) {
 
     if (!rzpSubRes.ok || !rzpSubData?.id) {
       console.error("[Cloudflare Razorpay Subscription Error]", rzpSubData || rzpRawText);
+      const detailedErr = rzpSubData?.error?.description || (typeof rzpSubData?.error === 'string' ? rzpSubData.error : '') || rzpRawText || "Failed to create Razorpay subscription on gateway";
       return jsonResponse({
         success: false,
-        error: rzpSubData?.error?.description || "Failed to create Razorpay subscription on gateway",
+        error: detailedErr,
+        razorpay_error: rzpSubData?.error,
       }, rzpSubRes.status || 400);
     }
 

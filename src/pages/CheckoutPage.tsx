@@ -36,8 +36,12 @@ WITH CHECK (auth.uid() = user_id);`;
     setIsProcessing(true);
     setErrorMessage(null);
 
-    // Development/Test simulated checkout flow
-    const res = await subscribeUser();
+    const res = await subscribeUser({
+      name: billingName.trim(),
+      email: billingEmail.trim(),
+      upiId: paymentMethod === 'upi' ? upiId.trim() : undefined,
+      method: paymentMethod,
+    });
     setIsProcessing(false);
     if (res?.success) {
       setIsSuccess(true);

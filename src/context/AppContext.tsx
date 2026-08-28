@@ -207,7 +207,7 @@ interface AppContextType {
   upgradeModalFeature: string | null;
   openUpgradeModal: (featureName?: string) => void;
   closeUpgradeModal: () => void;
-  subscribeUser: (plan?: string) => Promise<{ success: boolean; error?: string }>;
+  subscribeUser: (options?: string | { plan?: string; name?: string; email?: string; contact?: string; upiId?: string; method?: 'upi' | 'card' | 'netbanking' }) => Promise<{ success: boolean; error?: string }>;
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
 
   // AI Actions
@@ -2027,17 +2027,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleSettings = () => setIsSettingsOpen((prev) => !prev);
   const closeSettings = () => setIsSettingsOpen(false);
 
-  const subscribeUser = async (_plan: string = 'LEVELUP_PRO'): Promise<{ success: boolean; error?: string }> => {
+  const subscribeUser = async (options?: string | { plan?: string; name?: string; email?: string; contact?: string; upiId?: string; method?: 'upi' | 'card' | 'netbanking' }): Promise<{ success: boolean; error?: string }> => {
+    const customOpts = typeof options === 'object' ? options : {};
     // 1. Get authenticated user
     let currentUserId = user?.id;
-    let currentUserEmail = user?.email;
-    let currentUserName = user?.user_metadata?.full_name || state.profile.name;
+    let currentUserEmail = customOpts.email || user?.email;
+    let currentUserName = customOpts.name || user?.user_metadata?.full_name || state.profile.name;
+    let currentUserContact = customOpts.contact || user?.user_metadata?.phone || '';
     try {
       const { data: authData } = await supabase.auth.getUser();
       if (authData?.user?.id) {
         currentUserId = authData.user.id;
-        currentUserEmail = authData.user.email || currentUserEmail;
-        currentUserName = authData.user.user_metadata?.full_name || currentUserName;
+        currentUserEmail = customOpts.email || authData.user.email || currentUserEmail;
+        currentUserName = customOpts.name || authData.user.user_metadata?.full_name || currentUserName;
+        currentUserContact = customOpts.contact || authData.user.user_metadata?.phone || currentUserContact;
       }
     } catch (e) {
       console.warn('Error resolving user auth:', e);
@@ -2054,8 +2057,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         user: {
           id: currentUserId!,
           email: currentUserEmail,
-          user_metadata: { full_name: currentUserName },
+          user_metadata: { full_name: currentUserName, phone: currentUserContact },
         },
+        name: currentUserName,
+        email: currentUserEmail,
+        contact: currentUserContact,
+        vpa: customOpts.upiId,
+        method: customOpts.method,
         onSuccess: (subData: DbSubscription) => {
           setDbSubscription(subData);
           const today = new Date().toISOString().split('T')[0];

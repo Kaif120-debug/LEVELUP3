@@ -198,81 +198,75 @@ app.post(["/api/payment/create-subscription", "/api/payments/create-subscription
     const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
     const razorpayPlanId = (process.env.RAZORPAY_PLAN_ID || "").trim();
 
-    // If Razorpay API keys are configured, make actual call to Razorpay Subscriptions API
-    if (razorpayKeyId && razorpayKeySecret) {
-      if (!razorpayPlanId) {
-        return res.status(400).json({
-          success: false,
-          error: "RAZORPAY_PLAN_ID is not configured in server environment variables.",
-        });
-      }
-
-      const authHeaderBasic = "Basic " + Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
-
-      // Create subscription in Razorpay using the configured RAZORPAY_PLAN_ID
-      // Razorpay requires a bounded integer for `total_count` (up to 100 years = 1200 monthly billing cycles)
-      // to support perpetual auto-recurring billing until cancelled by the user.
-      const subPayload: any = {
-        plan_id: razorpayPlanId,
-        total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
-        quantity: 1,
-        customer_notify: 1,
-        notes: {
-          user_id: effectiveUserId,
-          email: userEmail || "",
-          name: name || "",
-        },
-      };
-
-      const rzpSubRes = await fetch("https://api.razorpay.com/v1/subscriptions", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: authHeaderBasic,
-        },
-        body: JSON.stringify(subPayload),
-      });
-
-      const rzpRawText = await rzpSubRes.text();
-      let rzpSubData: any = null;
-      try {
-        if (rzpRawText) {
-          rzpSubData = JSON.parse(rzpRawText);
-        }
-      } catch {
-        rzpSubData = null;
-      }
-
-      if (!rzpSubRes.ok || !rzpSubData?.id) {
-        console.error("[Razorpay Subscription API Error]", rzpSubData || rzpRawText);
-        return res.status(rzpSubRes.status || 400).json({
-          success: false,
-          error: rzpSubData?.error?.description || "Failed to create Razorpay subscription on gateway",
-        });
-      }
-
-      return res.json({
-        success: true,
-        subscription_id: rzpSubData.id,
-        key_id: razorpayKeyId,
-        plan_id: razorpayPlanId,
-        currency: "INR",
-        name: "LEVELUP",
-        description: "LEVELUP PRO Subscription (₹129/month)",
+    // Live Razorpay Subscriptions API execution
+    if (!razorpayKeyId || !razorpayKeySecret) {
+      return res.status(500).json({
+        success: false,
+        error: "Razorpay credentials (RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET) are not configured in server environment variables.",
       });
     }
 
-    // Otherwise, graceful test simulation mode (e.g. preview environment without live Razorpay keys)
-    const simulatedSubId = `sub_test_${Date.now()}`;
+    if (!razorpayPlanId) {
+      return res.status(500).json({
+        success: false,
+        error: "RAZORPAY_PLAN_ID is not configured in server environment variables.",
+      });
+    }
+
+    const authHeaderBasic = "Basic " + Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
+
+    // Create subscription in Razorpay using the configured LIVE RAZORPAY_PLAN_ID
+    // Razorpay requires a bounded integer for `total_count` (up to 100 years = 1200 monthly billing cycles)
+    // to support perpetual auto-recurring billing until cancelled by the user.
+    const subPayload: any = {
+      plan_id: razorpayPlanId,
+      total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
+      quantity: 1,
+      customer_notify: 1,
+      notes: {
+        user_id: effectiveUserId,
+        email: userEmail || "",
+        name: name || "",
+      },
+    };
+
+    const rzpSubRes = await fetch("https://api.razorpay.com/v1/subscriptions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: authHeaderBasic,
+      },
+      body: JSON.stringify(subPayload),
+    });
+
+    const rzpRawText = await rzpSubRes.text();
+    let rzpSubData: any = null;
+    try {
+      if (rzpRawText) {
+        rzpSubData = JSON.parse(rzpRawText);
+      }
+    } catch {
+      rzpSubData = null;
+    }
+
+    if (!rzpSubRes.ok || !rzpSubData?.id) {
+      console.error("[Razorpay Subscription API Error]", rzpSubData || rzpRawText);
+      const detailedErr = rzpSubData?.error?.description || (typeof rzpSubData?.error === 'string' ? rzpSubData.error : '') || rzpRawText || "Failed to create Razorpay subscription on gateway";
+      return res.status(rzpSubRes.status || 400).json({
+        success: false,
+        error: detailedErr,
+        razorpay_error: rzpSubData?.error,
+      });
+    }
+
     return res.json({
       success: true,
-      subscription_id: simulatedSubId,
-      key_id: razorpayKeyId || "rzp_test_simulation",
-      amount: 12900,
+      subscription_id: rzpSubData.id,
+      key_id: razorpayKeyId,
+      plan_id: razorpayPlanId,
       currency: "INR",
       name: "LEVELUP",
       description: "LEVELUP PRO Subscription (₹129/month)",
-      is_test_simulation: true,
     });
   } catch (err: any) {
     console.error("[Create Subscription Exception]", err);
@@ -284,7 +278,7 @@ app.post(["/api/payment/create-subscription", "/api/payments/create-subscription
 app.post(["/api/payment/verify-subscription", "/api/payments/verify-subscription"], async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  const { userId, razorpay_payment_id, razorpay_subscription_id, razorpay_signature, is_simulation } = req.body || {};
+  const { userId, razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body || {};
 
   try {
     const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
@@ -310,17 +304,23 @@ app.post(["/api/payment/verify-subscription", "/api/payments/verify-subscription
 
     const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
 
-    // Verify HMAC SHA256 signature if real Razorpay keys are configured and not simulated
-    if (razorpayKeySecret && !is_simulation) {
-      const generatedSignature = crypto
-        .createHmac("sha256", razorpayKeySecret)
-        .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
-        .digest("hex");
+    if (!razorpayKeySecret) {
+      return res.status(500).json({ success: false, error: "RAZORPAY_KEY_SECRET is not configured on server" });
+    }
 
-      if (generatedSignature !== razorpay_signature) {
-        console.error("[Razorpay Signature Verification Mismatch]");
-        return res.status(400).json({ success: false, error: "Invalid Razorpay payment signature" });
-      }
+    if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+      return res.status(400).json({ success: false, error: "Payment verification parameters missing" });
+    }
+
+    // Verify HMAC SHA256 signature using live RAZORPAY_KEY_SECRET
+    const generatedSignature = crypto
+      .createHmac("sha256", razorpayKeySecret)
+      .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
+      .digest("hex");
+
+    if (generatedSignature !== razorpay_signature) {
+      console.error("[Razorpay Signature Verification Mismatch]");
+      return res.status(400).json({ success: false, error: "Invalid Razorpay payment signature" });
     }
 
     // Persist verified Pro status in Supabase public.subscriptions table

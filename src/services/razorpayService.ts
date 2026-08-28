@@ -45,8 +45,13 @@ export interface RazorpayCheckoutOptions {
   user: {
     id: string;
     email?: string | null;
-    user_metadata?: { full_name?: string };
+    user_metadata?: { full_name?: string; phone?: string };
   };
+  name?: string;
+  email?: string;
+  contact?: string;
+  vpa?: string;
+  method?: 'upi' | 'card' | 'netbanking';
   onSuccess: (data: DbSubscription) => void;
   onError: (error: string) => void;
   onDismiss?: () => void;
@@ -106,14 +111,18 @@ async function safeApiRequest<T = any>(
 }
 
 /**
- * Initiates Razorpay Test Mode Subscription Flow:
- * 1. Calls server POST /api/payments/create-subscription to get subscription_id & key_id
- * 2. Launches Razorpay modal with subscription_id
- * 3. On payment completion, calls server POST /api/payments/verify-subscription
- * 4. Updates database state and returns verified DbSubscription
+ * Initiates Razorpay Live Mode Subscription Flow:
+ * 1. Calls server POST /api/payment/create-subscription to get live subscription_id & live key_id
+ * 2. Launches official Razorpay Checkout modal for recurring subscription (UPI Autopay, UPI QR, Cards, Net Banking)
+ * 3. On payment authorization, sends signatures to server POST /api/payment/verify-subscription
+ * 4. Updates Supabase subscription state and returns verified DbSubscription
  */
 export async function startRazorpaySubscription({
   user,
+  name: customName,
+  email: customEmail,
+  contact: customContact,
+  vpa: customVpa,
   onSuccess,
   onError,
   onDismiss,
@@ -123,16 +132,18 @@ export async function startRazorpaySubscription({
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData?.session?.access_token;
 
-    // 2. Request backend to create Razorpay subscription (tries /api/payment/create-subscription first)
+    const effectiveName = customName || user.user_metadata?.full_name || '';
+    const effectiveEmail = customEmail || user.email || '';
+    const effectiveContact = customContact || user.user_metadata?.phone || '';
+
+    // 2. Request backend to create live Razorpay subscription
     let createResult = await safeApiRequest<{
       success: boolean;
       subscription_id: string;
       key_id: string;
-      amount?: number;
       currency?: string;
       name?: string;
       description?: string;
-      is_test_simulation?: boolean;
       error?: string;
     }>('/api/payment/create-subscription', {
       method: 'POST',
@@ -142,8 +153,8 @@ export async function startRazorpaySubscription({
       },
       body: JSON.stringify({
         userId: user.id,
-        email: user.email,
-        name: user.user_metadata?.full_name || '',
+        email: effectiveEmail,
+        name: effectiveName,
       }),
     });
 
@@ -153,11 +164,9 @@ export async function startRazorpaySubscription({
         success: boolean;
         subscription_id: string;
         key_id: string;
-        amount?: number;
         currency?: string;
         name?: string;
         description?: string;
-        is_test_simulation?: boolean;
         error?: string;
       }>('/api/payments/create-subscription', {
         method: 'POST',
@@ -167,96 +176,46 @@ export async function startRazorpaySubscription({
         },
         body: JSON.stringify({
           userId: user.id,
-          email: user.email,
-          name: user.user_metadata?.full_name || '',
+          email: effectiveEmail,
+          name: effectiveName,
         }),
       });
     }
 
-    if (!createResult.ok || !createResult.data?.success) {
+    if (!createResult.ok || !createResult.data?.success || !createResult.data?.subscription_id) {
       throw new Error(createResult.error || createResult.data?.error || 'Failed to create Razorpay subscription session');
     }
 
     const {
       subscription_id,
       key_id,
-      amount = 12900,
       currency = 'INR',
       name = 'LEVELUP',
       description = 'LEVELUP PRO Subscription (₹129/month)',
-      is_test_simulation = false,
     } = createResult.data;
 
-    // 3. If in test simulation mode (e.g. Razorpay keys not yet set in environment)
-    if (is_test_simulation) {
-      console.info('[Razorpay Test Mode] Simulating test payment completion...');
-
-      let verifyResult = await safeApiRequest<{
-        success: boolean;
-        data: DbSubscription;
-        error?: string;
-      }>('/api/payment/verify-subscription', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          razorpay_payment_id: `pay_sim_${Date.now()}`,
-          razorpay_subscription_id: subscription_id,
-          razorpay_signature: `sig_sim_${Date.now()}`,
-          is_simulation: true,
-        }),
-      });
-
-      if (!verifyResult.ok && verifyResult.status === 404) {
-        verifyResult = await safeApiRequest<{
-          success: boolean;
-          data: DbSubscription;
-          error?: string;
-        }>('/api/payments/verify-subscription', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({
-            userId: user.id,
-            razorpay_payment_id: `pay_sim_${Date.now()}`,
-            razorpay_subscription_id: subscription_id,
-            razorpay_signature: `sig_sim_${Date.now()}`,
-            is_simulation: true,
-          }),
-        });
-      }
-
-      if (!verifyResult.ok || !verifyResult.data?.success || !verifyResult.data?.data) {
-        throw new Error(verifyResult.error || verifyResult.data?.error || 'Failed to verify simulated subscription');
-      }
-
-      onSuccess(verifyResult.data.data);
-      return;
-    }
-
-    // 4. Load Razorpay Checkout SDK
+    // 3. Load Razorpay Checkout SDK
     const isScriptLoaded = await loadRazorpayScript();
     if (!isScriptLoaded || !window.Razorpay) {
       throw new Error('Razorpay Checkout SDK could not be loaded. Please check your internet connection.');
     }
 
-    // 5. Open Razorpay Checkout modal for recurring subscription
-    // Note: For Razorpay Subscriptions, amount and interval are dictated by subscription_id / plan_id
+    const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/icon.png` : undefined;
+
+    // 4. Open Razorpay Checkout modal in LIVE mode for recurring subscription
+    // Supports UPI Autopay (Google Pay, PhonePe, Paytm, BHIM), UPI QR mandate, Cards, and Net Banking
     const options: any = {
       key: key_id,
       subscription_id: subscription_id,
       name: name,
       description: description,
-      image: '/icon.png',
+      image: logoUrl,
       currency: currency,
       prefill: {
-        name: user.user_metadata?.full_name || '',
-        email: user.email || '',
+        name: effectiveName,
+        email: effectiveEmail,
+        ...(effectiveContact ? { contact: effectiveContact } : {}),
+        ...(customVpa ? { vpa: customVpa } : {}),
       },
       notes: {
         user_id: user.id,
@@ -265,6 +224,7 @@ export async function startRazorpaySubscription({
         color: '#2e6930', // LEVELUP primary forest green
       },
       modal: {
+        confirm_close: true,
         ondismiss: () => {
           if (onDismiss) onDismiss();
         },
@@ -275,7 +235,7 @@ export async function startRazorpaySubscription({
         razorpay_signature: string;
       }) => {
         try {
-          // 6. Verify signature on backend
+          // 5. Verify HMAC SHA-256 signature on backend (Live Secret verification)
           let verifyResult = await safeApiRequest<{
             success: boolean;
             data: DbSubscription;
@@ -320,7 +280,7 @@ export async function startRazorpaySubscription({
 
           onSuccess(verifyResult.data.data);
         } catch (verifyErr: any) {
-          console.error('[Razorpay Verification Error]', verifyErr);
+          console.error('[Razorpay Live Verification Error]', verifyErr);
           onError(verifyErr.message || 'Verification failed after payment');
         }
       },
@@ -329,7 +289,7 @@ export async function startRazorpaySubscription({
     const rzpInstance = new window.Razorpay(options);
     rzpInstance.on('payment.failed', (response: any) => {
       console.error('[Razorpay Payment Failed]', response.error);
-      onError(response.error?.description || 'Payment was unsuccessful. Please try again.');
+      onError(response.error?.description || response.error?.reason || 'Payment was unsuccessful. Please try again.');
     });
 
     rzpInstance.open();

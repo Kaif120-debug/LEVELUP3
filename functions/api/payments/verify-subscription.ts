@@ -71,7 +71,7 @@ export async function onRequestPost(context: any) {
     return jsonResponse({ success: false, error: "Invalid JSON in request body" }, 400);
   }
 
-  const { userId, razorpay_payment_id, razorpay_subscription_id, razorpay_signature, is_simulation } = body;
+  const { userId, razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = body;
 
   try {
     const supabaseUrl = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
@@ -103,15 +103,21 @@ export async function onRequestPost(context: any) {
 
     const razorpayKeySecret = (env.RAZORPAY_KEY_SECRET || "").trim();
 
-    // Verify HMAC SHA256 signature if real Razorpay keys are configured and not simulated
-    if (razorpayKeySecret && !is_simulation) {
-      const payload = `${razorpay_payment_id}|${razorpay_subscription_id}`;
-      const isValid = await verifyHmacSha256(razorpayKeySecret, payload, razorpay_signature || "");
+    if (!razorpayKeySecret) {
+      return jsonResponse({ success: false, error: "RAZORPAY_KEY_SECRET is not configured in Worker environment" }, 500);
+    }
 
-      if (!isValid) {
-        console.error("[Razorpay Signature Verification Mismatch]");
-        return jsonResponse({ success: false, error: "Invalid Razorpay payment signature" }, 400);
-      }
+    if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+      return jsonResponse({ success: false, error: "Payment verification parameters missing" }, 400);
+    }
+
+    // Verify HMAC SHA256 signature using live RAZORPAY_KEY_SECRET
+    const payload = `${razorpay_payment_id}|${razorpay_subscription_id}`;
+    const isValid = await verifyHmacSha256(razorpayKeySecret, payload, razorpay_signature || "");
+
+    if (!isValid) {
+      console.error("[Razorpay Signature Verification Mismatch]");
+      return jsonResponse({ success: false, error: "Invalid Razorpay payment signature" }, 400);
     }
 
     if (!supabaseUrl || !anonKey) {
