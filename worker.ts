@@ -30,11 +30,16 @@ export default {
     const context = { request, env, ctx, params: {} };
 
     // 1. Health check & Public configuration
-    if (pathname === "/api/health") {
+    if (pathname === "/api/health" || pathname === "/health") {
       return healthGet();
     }
 
-    if (pathname === "/api/config" || pathname === "/api/public-config") {
+    if (
+      pathname === "/api/config" ||
+      pathname === "/config" ||
+      pathname === "/api/public-config" ||
+      pathname === "/public-config"
+    ) {
       if (method === "OPTIONS") {
         return configOptions();
       }

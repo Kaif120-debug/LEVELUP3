@@ -2,12 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { isSupabaseConfigured } from '../lib/supabase';
 
 export const SettingsModal: React.FC = () => {
   const navigate = useNavigate();
   const { isSettingsOpen, closeSettings, state, updateProfile, cancelSubscription, subscribeUser, isDbLoading } = useApp();
-  const { user, session, signOut } = useAuth();
+  const { user, session, signOut, isConfigured } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'database'>('profile');
   
   const [name, setName] = useState(user?.user_metadata?.full_name || state.profile.name || '');
@@ -318,23 +317,23 @@ export const SettingsModal: React.FC = () => {
             {/* Status Header */}
             <div className="p-4 rounded-xl border border-outline-variant bg-surface-container-low flex items-start gap-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                isSupabaseConfigured ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
+                isConfigured ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'
               }`}>
                 <span className="material-symbols-outlined text-lg">
-                  {isSupabaseConfigured ? 'cloud_done' : 'cloud_sync'}
+                  {isConfigured ? 'cloud_done' : 'cloud_sync'}
                 </span>
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h4 className="font-bold text-sm text-on-surface">Supabase Cloud Database</h4>
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase ${
-                    isSupabaseConfigured ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
+                    isConfigured ? 'bg-emerald-500/20 text-emerald-600 dark:text-emerald-400' : 'bg-amber-500/20 text-amber-600 dark:text-amber-400'
                   }`}>
-                    {isSupabaseConfigured ? 'Connected' : 'Local Fallback Mode'}
+                    {isConfigured ? 'Connected' : 'Local Fallback Mode'}
                   </span>
                 </div>
                 <p className="text-xs text-on-surface-variant mt-1 leading-relaxed">
-                  {isSupabaseConfigured
+                  {isConfigured
                     ? 'Your frontend is fully configured with Supabase. All workout plans, nutrition data, tasks, invoices, student courses, and subscriptions are synchronized.'
                     : 'Supabase credentials can be configured via environment variables (VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY). All local features remain fully functional.'}
                 </p>

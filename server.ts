@@ -137,7 +137,7 @@ app.get("/api/health", (req, res) => {
 });
 
 // Public frontend configuration endpoint (safe public variables only)
-app.get(["/api/config", "/api/public-config"], (req, res) => {
+app.get(["/api/config", "/config", "/api/public-config", "/public-config"], (req, res) => {
   const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
   const supabaseAnonKey = (
     process.env.SUPABASE_ANON_KEY ||
@@ -150,6 +150,8 @@ app.get(["/api/config", "/api/public-config"], (req, res) => {
   res.json({
     supabaseUrl,
     supabaseAnonKey,
+    supabaseKey: supabaseAnonKey,
+    configured: Boolean(supabaseUrl && supabaseAnonKey),
   });
 });
 

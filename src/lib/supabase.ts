@@ -2,7 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 function cleanEnvString(raw?: string | null): string {
   if (!raw) return '';
-  let s = raw.trim();
+  let s = String(raw).trim();
   if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
     s = s.slice(1, -1).trim();
   }
@@ -58,8 +58,7 @@ export function isPlaceholderConfig(url: string, key: string): boolean {
   );
 }
 
-// Initial environment variable extraction from Vite build
-// Uses import.meta.env.VITE_SUPABASE_URL and import.meta.env.VITE_SUPABASE_ANON_KEY
+// Initial environment variable extraction (if available during build)
 const initialRawUrl = cleanEnvString(
   import.meta.env.VITE_SUPABASE_URL ||
   (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_SUPABASE_URL) ||
@@ -88,8 +87,6 @@ export let isSupabaseConfigured = getIsSupabaseConfigured();
 
 /**
  * Resolves the base application URL for auth redirects (email confirmation, OAuth, password reset).
- * In production deployment, respects VITE_SITE_URL or VITE_APP_URL if provided.
- * In development and AI Studio preview, dynamically uses window.location.origin.
  */
 export function getAppBaseUrl(): string {
   const configuredUrl = cleanEnvString(
@@ -155,31 +152,81 @@ export const supabase: SupabaseClient = new Proxy({} as SupabaseClient, {
   },
 });
 
-// Runtime configuration hydration: If Vite build did not have VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY baked in,
-// fetch safe public config from backend /api/config (supported on Cloudflare Worker & Express)
-if (typeof window !== 'undefined') {
-  (async () => {
+let runtimeConfigPromise: Promise<boolean> | null = null;
+
+/**
+ * Fetches runtime configuration from /api/config or /config.
+ * Safe public variables only (Supabase URL and Anon Key).
+ */
+export async function fetchRuntimeConfig(): Promise<boolean> {
+  if (getIsSupabaseConfigured()) {
+    return true;
+  }
+
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const endpoints = ['/api/config', '/config', '/api/public-config'];
+
+  for (const endpoint of endpoints) {
     try {
-      if (!getIsSupabaseConfigured()) {
-        const res = await fetch('/api/config');
-        if (res.ok) {
+      const res = await fetch(endpoint, {
+        headers: {
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      });
+
+      if (res.ok) {
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
           const config = await res.json();
-          if (config?.supabaseUrl && config?.supabaseAnonKey) {
-            const formatted = formatSupabaseUrl(config.supabaseUrl);
-            const key = cleanEnvString(config.supabaseAnonKey);
+          const rawUrl = config?.supabaseUrl || config?.SUPABASE_URL || config?.url;
+          const rawKey = config?.supabaseAnonKey || config?.supabaseKey || config?.SUPABASE_ANON_KEY || config?.SUPABASE_PUBLISHABLE_KEY || config?.anonKey || config?.key;
+
+          if (rawUrl && rawKey) {
+            const formatted = formatSupabaseUrl(rawUrl);
+            const key = cleanEnvString(rawKey);
+
             if (formatted && key && !isPlaceholderConfig(formatted, key)) {
               supabaseUrl = formatted;
               supabaseKey = key;
               isSupabaseConfigured = true;
               activeSupabaseClient = createSupabaseInstance(formatted, key);
-              console.log('[Supabase] Initialized with runtime configuration from /api/config');
+              console.log('[Supabase] Initialized with runtime configuration from', endpoint);
               configListeners.forEach((fn) => fn(true));
+              return true;
             }
           }
         }
       }
     } catch (e) {
-      // Non-blocking background fetch
+      console.warn(`[Supabase] Failed to fetch config from ${endpoint}:`, e);
     }
-  })();
+  }
+
+  return getIsSupabaseConfigured();
+}
+
+/**
+ * Ensures the Supabase client is configured, waiting for runtime config if necessary.
+ */
+export async function ensureSupabaseReady(): Promise<boolean> {
+  if (getIsSupabaseConfigured()) {
+    return true;
+  }
+
+  if (!runtimeConfigPromise) {
+    runtimeConfigPromise = fetchRuntimeConfig();
+  }
+
+  return runtimeConfigPromise;
+}
+
+// Auto-trigger config fetch on client load
+if (typeof window !== 'undefined') {
+  ensureSupabaseReady().catch((err) => {
+    console.warn('[Supabase] Initialization error:', err);
+  });
 }

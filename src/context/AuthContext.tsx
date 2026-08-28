@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { User, Session, AuthError } from '@supabase/supabase-js';
-import { supabase, getIsSupabaseConfigured, onSupabaseConfigChange, getAuthRedirectUrl } from '../lib/supabase';
+import {
+  supabase,
+  getIsSupabaseConfigured,
+  ensureSupabaseReady,
+  onSupabaseConfigChange,
+  getAuthRedirectUrl,
+} from '../lib/supabase';
 
 interface AuthContextType {
   user: User | null;
@@ -25,21 +31,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    let authSubscription: { unsubscribe: () => void } | null = null;
 
-    // Check active session on mount
+    // Check active session and runtime config on mount
     const initAuth = async () => {
       try {
-        const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.warn('Supabase auth session error:', error.message);
-        }
+        await ensureSupabaseReady();
+        const configured = getIsSupabaseConfigured();
+
         if (mounted) {
-          setSession(initialSession);
-          setUser(initialSession?.user ?? null);
-          setIsAuthLoading(false);
+          setIsConfigured(configured);
+        }
+
+        if (configured) {
+          const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+          if (error) {
+            console.warn('Supabase auth session error:', error.message);
+          }
+          if (mounted) {
+            setSession(initialSession);
+            setUser(initialSession?.user ?? null);
+          }
+
+          // Listen for auth changes (login, logout, token refresh, password recovery)
+          if (!authSubscription) {
+            const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
+              if (mounted) {
+                setSession(currentSession);
+                setUser(currentSession?.user ?? null);
+                setIsAuthLoading(false);
+              }
+            });
+            authSubscription = subscription;
+          }
         }
       } catch (err) {
         console.error('Error initializing auth session:', err);
+      } finally {
         if (mounted) {
           setIsAuthLoading(false);
         }
@@ -47,15 +75,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     initAuth();
-
-    // Listen for auth changes (login, logout, token refresh, password recovery)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
-      if (mounted) {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
-        setIsAuthLoading(false);
-      }
-    });
 
     // Listen for runtime configuration changes (e.g. from /api/config)
     const unsubscribeConfig = onSupabaseConfigChange((configured) => {
@@ -67,13 +86,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
-      subscription.unsubscribe();
+      if (authSubscription) {
+        authSubscription.unsubscribe();
+      }
       unsubscribeConfig();
     };
   }, []);
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
+      await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
         return {
           data: null,
@@ -99,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signIn = async (email: string, password: string) => {
     try {
+      await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
         return {
           data: null,
@@ -117,6 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = async () => {
     try {
+      await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
         return {
           data: null,
@@ -144,6 +168,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      await ensureSupabaseReady();
       if (getIsSupabaseConfigured()) {
         const { error } = await supabase.auth.signOut();
         setUser(null);
@@ -162,6 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (email: string) => {
     try {
+      await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
         return {
           data: null,
@@ -180,6 +206,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePassword = async (newPassword: string) => {
     try {
+      await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
         return {
           data: null,
