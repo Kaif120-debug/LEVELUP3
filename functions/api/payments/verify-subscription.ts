@@ -101,7 +101,12 @@ export async function onRequestPost(context: any) {
       return jsonResponse({ success: false, error: "Authenticated user ID is required" }, 400);
     }
 
-    const razorpayKeySecret = (env.RAZORPAY_KEY_SECRET || "").trim();
+    const razorpayKeySecret = (
+      env?.RAZORPAY_KEY_SECRET ||
+      (typeof process !== "undefined" && process.env?.RAZORPAY_KEY_SECRET) ||
+      (typeof globalThis !== "undefined" && (globalThis as any).RAZORPAY_KEY_SECRET) ||
+      ""
+    ).trim();
 
     if (!razorpayKeySecret) {
       return jsonResponse({ success: false, error: "RAZORPAY_KEY_SECRET is not configured in Worker environment" }, 500);

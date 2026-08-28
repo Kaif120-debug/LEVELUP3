@@ -113,9 +113,24 @@ export async function onRequestPost(context: any) {
       }
     }
 
-    const razorpayKeyId = (env.RAZORPAY_KEY_ID || "").trim();
-    const razorpayKeySecret = (env.RAZORPAY_KEY_SECRET || "").trim();
-    const razorpayPlanId = (env.RAZORPAY_PLAN_ID || "").trim();
+    const razorpayKeyId = (
+      env?.RAZORPAY_KEY_ID ||
+      (typeof process !== "undefined" && process.env?.RAZORPAY_KEY_ID) ||
+      (typeof globalThis !== "undefined" && (globalThis as any).RAZORPAY_KEY_ID) ||
+      ""
+    ).trim();
+    const razorpayKeySecret = (
+      env?.RAZORPAY_KEY_SECRET ||
+      (typeof process !== "undefined" && process.env?.RAZORPAY_KEY_SECRET) ||
+      (typeof globalThis !== "undefined" && (globalThis as any).RAZORPAY_KEY_SECRET) ||
+      ""
+    ).trim();
+    const razorpayPlanId = (
+      env?.RAZORPAY_PLAN_ID ||
+      (typeof process !== "undefined" && process.env?.RAZORPAY_PLAN_ID) ||
+      (typeof globalThis !== "undefined" && (globalThis as any).RAZORPAY_PLAN_ID) ||
+      ""
+    ).trim();
 
     if (!razorpayKeyId || !razorpayKeySecret) {
       return jsonResponse({

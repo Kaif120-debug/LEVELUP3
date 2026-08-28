@@ -54,7 +54,12 @@ export async function onRequestPost(context: any) {
 
   try {
     const rawPayload = await request.text();
-    const webhookSecret = (env.RAZORPAY_WEBHOOK_SECRET || env.RAZORPAY_KEY_SECRET || "").trim();
+    const webhookSecret = (
+      env?.RAZORPAY_WEBHOOK_SECRET ||
+      env?.RAZORPAY_KEY_SECRET ||
+      (typeof process !== "undefined" && (process.env?.RAZORPAY_WEBHOOK_SECRET || process.env?.RAZORPAY_KEY_SECRET)) ||
+      ""
+    ).trim();
     const signature = request.headers.get("x-razorpay-signature") || "";
 
     if (webhookSecret && signature) {
