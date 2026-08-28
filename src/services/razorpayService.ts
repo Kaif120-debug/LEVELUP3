@@ -203,19 +203,19 @@ export async function startRazorpaySubscription({
     const logoUrl = typeof window !== 'undefined' ? `${window.location.origin}/icon.png` : undefined;
 
     // 4. Open Razorpay Checkout modal in LIVE mode for recurring subscription
-    // Supports UPI Autopay (Google Pay, PhonePe, Paytm, BHIM), UPI QR mandate, Cards, and Net Banking
+    // Per Razorpay Subscriptions documentation:
+    // When subscription_id is provided, plan details, amount, and currency are derived directly from subscription_id.
+    // Razorpay standard checkout dynamically renders UPI Autopay (GPay, PhonePe, Paytm, BHIM, UPI QR mandate), Cards, and Net Banking.
     const options: any = {
       key: key_id,
       subscription_id: subscription_id,
-      name: name,
-      description: description,
-      image: logoUrl,
-      currency: currency,
+      name: name || 'LEVELUP',
+      description: description || 'LEVELUP PRO Subscription (₹129/month)',
+      ...(logoUrl ? { image: logoUrl } : {}),
       prefill: {
-        name: effectiveName,
-        email: effectiveEmail,
+        ...(effectiveName ? { name: effectiveName } : {}),
+        ...(effectiveEmail ? { email: effectiveEmail } : {}),
         ...(effectiveContact ? { contact: effectiveContact } : {}),
-        ...(customVpa ? { vpa: customVpa } : {}),
       },
       notes: {
         user_id: user.id,
