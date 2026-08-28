@@ -148,9 +148,13 @@ export async function onRequestPost(context: any) {
 
     const authHeaderBasic = "Basic " + btoa(`${razorpayKeyId}:${razorpayKeySecret}`);
 
+    // Razorpay monthly recurring subscription:
+    // `total_count: 120` represents 120 monthly billing cycles (10 years, Razorpay's supported maximum).
+    // Razorpay automatically computes the valid end date and handles monthly auto-recurring debits (UPI Autopay, Cards, Net Banking).
+    // We do not send `end_at` or `expire_by` so Razorpay applies valid defaults without timestamp validation errors.
     const subPayload = {
       plan_id: razorpayPlanId,
-      total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
+      total_count: 120, // 10 years (120 monthly billing cycles)
       quantity: 1,
       customer_notify: 1,
       notes: {

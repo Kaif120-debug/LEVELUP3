@@ -235,11 +235,12 @@ app.post(["/api/payment/create-subscription", "/api/payments/create-subscription
     const authHeaderBasic = "Basic " + Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
 
     // Create subscription in Razorpay using the configured LIVE RAZORPAY_PLAN_ID
-    // Razorpay requires a bounded integer for `total_count` (up to 100 years = 1200 monthly billing cycles)
-    // to support perpetual auto-recurring billing until cancelled by the user.
+    // `total_count: 120` represents 120 monthly billing cycles (10 years, Razorpay maximum limit).
+    // Razorpay automatically computes the valid end date and handles monthly auto-recurring debits.
+    // We do not send `end_at` or `expire_by` so Razorpay applies valid defaults without timestamp validation errors.
     const subPayload: any = {
       plan_id: razorpayPlanId,
-      total_count: 1200, // 100 years (1200 monthly cycles) - Razorpay standard for perpetual recurring until cancelled
+      total_count: 120, // 10 years (120 monthly cycles)
       quantity: 1,
       customer_notify: 1,
       notes: {
