@@ -4,6 +4,7 @@ import { useApp } from '../context/AppContext';
 import { DbDietPlan, DbDietMeal, DbDietFoodItem, DbGroceryItem } from '../types';
 import { useSubscription } from '../hooks/useSubscription';
 import { ProBadge } from '../components/ProBadge';
+import { MacroCoach } from '../components/nutrition/MacroCoach';
 
 export const NutritionPage: React.FC = () => {
   const {
@@ -35,7 +36,7 @@ export const NutritionPage: React.FC = () => {
 
   const { isPro, openUpgradeModal } = useSubscription();
 
-  const [activeTab, setActiveTab] = useState<'plans' | 'profile' | 'grocery'>('plans');
+  const [activeTab, setActiveTab] = useState<'plans' | 'macroCoach' | 'grocery' | 'profile'>('plans');
 
   // Modals state
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -392,6 +393,14 @@ export const NutritionPage: React.FC = () => {
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <button
+                onClick={() => setActiveTab('macroCoach')}
+                className="px-4 py-3 font-label-caps bg-primary/10 border border-primary text-primary rounded hover:bg-primary/20 transition-all uppercase cursor-pointer flex items-center gap-2 shadow-xs"
+              >
+                <span className="material-symbols-outlined text-base">calculate</span>
+                <span>AI MACRO COACH</span>
+                <ProBadge featureName="AI Macro Coach" size="xs" />
+              </button>
+              <button
                 onClick={() => {
                   if (!isPro) {
                     openUpgradeModal('AI Diet Generator');
@@ -399,7 +408,7 @@ export const NutritionPage: React.FC = () => {
                   }
                   setShowAIDietModal(true);
                 }}
-                className="px-4 py-3 font-label-caps bg-primary/10 border border-primary text-primary rounded hover:bg-primary/20 transition-all uppercase cursor-pointer flex items-center gap-2 shadow-xs"
+                className="px-4 py-3 font-label-caps bg-surface-container-high border border-outline-variant text-on-surface rounded hover:bg-surface-container-highest transition-all uppercase cursor-pointer flex items-center gap-2 shadow-xs"
               >
                 <span className="material-symbols-outlined text-base">auto_awesome</span>
                 <span>AI DIET GENERATOR</span>
@@ -429,10 +438,10 @@ export const NutritionPage: React.FC = () => {
           </header>
 
           {/* Tab Navigation */}
-          <div className="flex border-b border-outline-variant bg-surface-container-low px-6 pt-2 rounded-t-xl">
+          <div className="flex border-b border-outline-variant bg-surface-container-low px-6 pt-2 rounded-t-xl overflow-x-auto scrollbar-none">
             <button
               onClick={() => setActiveTab('plans')}
-              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 ${
+              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 shrink-0 ${
                 activeTab === 'plans'
                   ? 'border-primary text-primary font-bold'
                   : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -442,8 +451,20 @@ export const NutritionPage: React.FC = () => {
               <span>Diet Plans & Meals</span>
             </button>
             <button
+              onClick={() => setActiveTab('macroCoach')}
+              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 shrink-0 ${
+                activeTab === 'macroCoach'
+                  ? 'border-primary text-primary font-bold'
+                  : 'border-transparent text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">calculate</span>
+              <span>AI Macro Coach</span>
+              <ProBadge featureName="AI Macro Coach" size="xs" />
+            </button>
+            <button
               onClick={() => setActiveTab('grocery')}
-              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 ${
+              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 shrink-0 ${
                 activeTab === 'grocery'
                   ? 'border-primary text-primary font-bold'
                   : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -454,7 +475,7 @@ export const NutritionPage: React.FC = () => {
             </button>
             <button
               onClick={() => setActiveTab('profile')}
-              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 ${
+              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 flex items-center gap-2 shrink-0 ${
                 activeTab === 'profile'
                   ? 'border-primary text-primary font-bold'
                   : 'border-transparent text-on-surface-variant hover:text-on-surface'
@@ -479,12 +500,21 @@ export const NutritionPage: React.FC = () => {
                     {activeDietPlan?.goal || 'Maintain clean diet'}
                   </p>
                 </div>
-                <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-variant shadow-sm">
-                  <span className="font-label-caps text-xs text-on-surface-variant block mb-1">Daily Target Protein</span>
-                  <p className="text-stat-number text-primary">
-                    {activeDietPlan?.protein_target || nutritionProfile?.protein_target || 160}g
-                  </p>
-                  <p className="text-xs text-on-surface-variant mt-2">Optimal 2.0g/kg lean body mass</p>
+                <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-variant shadow-sm flex flex-col justify-between">
+                  <div>
+                    <span className="font-label-caps text-xs text-on-surface-variant block mb-1">Daily Target Protein</span>
+                    <p className="text-stat-number text-primary">
+                      {activeDietPlan?.protein_target || nutritionProfile?.protein_target || 160}g
+                    </p>
+                    <p className="text-xs text-on-surface-variant mt-1">Science-based 2.0g/kg target</p>
+                  </div>
+                  <button
+                    onClick={() => setActiveTab('macroCoach')}
+                    className="mt-3 py-1.5 px-2.5 bg-primary/10 hover:bg-primary/20 text-primary transition-colors text-[11px] font-label-caps rounded-lg uppercase flex items-center justify-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[13px]">calculate</span>
+                    <span>AI Macro Coach</span>
+                  </button>
                 </div>
                 <div className="bg-surface-container-lowest p-6 rounded-xl border border-surface-variant shadow-sm">
                   <span className="font-label-caps text-xs text-on-surface-variant block mb-1">Meals Scheduled</span>
@@ -768,6 +798,19 @@ export const NutritionPage: React.FC = () => {
                 )}
               </div>
             </div>
+          )}
+
+          {/* TAB: AI MACRO COACH */}
+          {activeTab === 'macroCoach' && (
+            <MacroCoach
+              onOpenDietGeneratorWithMacros={({ calories, protein, dietType: dt }) => {
+                setAiCalorieTarget(calories);
+                setAiProteinTarget(protein);
+                setAiDietType(dt);
+                setShowAIDietModal(true);
+              }}
+              showNotification={showNotification}
+            />
           )}
 
           {/* TAB 2: GROCERY LIST */}

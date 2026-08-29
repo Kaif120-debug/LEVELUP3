@@ -698,6 +698,8 @@ export interface DbSubscription {
   expires_at?: string;
   current_period_end?: string;
   cancel_at_period_end?: boolean;
+  razorpay_subscription_id?: string;
+  razorpay_payment_id?: string;
   created_at?: string;
   updated_at?: string;
 }

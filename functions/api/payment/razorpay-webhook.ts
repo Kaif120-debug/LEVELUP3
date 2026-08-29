@@ -80,35 +80,81 @@ export async function onRequestPost(context: any) {
 
     const { event, payload } = parsedBody;
     const subEntity = payload?.subscription?.entity || payload?.payment?.entity;
-    const userId = subEntity?.notes?.user_id;
+    const userId = subEntity?.notes?.user_id || subEntity?.notes?.userId;
+    const rzpSubId = payload?.subscription?.entity?.id || subEntity?.subscription_id;
+    const rzpPayId = payload?.payment?.entity?.id;
 
     const supabaseUrl = (env.SUPABASE_URL || env.VITE_SUPABASE_URL || "").trim();
     const serviceKey = (env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || "").trim();
 
-    if (userId && supabaseUrl && serviceKey) {
+    if (supabaseUrl && serviceKey) {
       const client = createClient(supabaseUrl, serviceKey);
+      const today = new Date().toISOString();
+      const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
 
-      if (event === "subscription.activated" || event === "subscription.charged" || event === "payment.captured") {
-        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-        await client
-          .from("subscriptions")
-          .upsert({
-            user_id: userId,
-            plan: "pro",
-            status: "active",
-            expires_at: expiresAt,
-            current_period_end: expiresAt,
-          });
+      if (event === "subscription.activated" || event === "subscription.charged" || event === "payment.captured" || event === "order.paid") {
+        if (userId) {
+          try {
+            await client
+              .from("subscriptions")
+              .upsert({
+                user_id: userId,
+                plan: "pro",
+                plan_tier: "pro",
+                status: "active",
+                expires_at: expiresAt,
+                current_period_end: expiresAt,
+                razorpay_subscription_id: rzpSubId || undefined,
+                razorpay_payment_id: rzpPayId || undefined,
+                updated_at: today,
+              });
+          } catch {
+            await client
+              .from("subscriptions")
+              .upsert({
+                user_id: userId,
+                plan: "pro",
+                status: "active",
+              });
+          }
+
+          try {
+            await client
+              .from("profiles")
+              .update({ is_pro: true, plan: "pro", updated_at: today })
+              .eq("user_id", userId);
+          } catch {
+            // ignore
+          }
+        } else if (rzpSubId) {
+          await client
+            .from("subscriptions")
+            .update({
+              plan: "pro",
+              status: "active",
+              expires_at: expiresAt,
+            })
+            .eq("razorpay_subscription_id", rzpSubId);
+        }
       } else if (event === "subscription.cancelled" || event === "subscription.halted" || event === "subscription.completed") {
-        await client
-          .from("subscriptions")
-          .update({ status: "canceled" })
-          .eq("user_id", userId);
+        if (userId) {
+          await client
+            .from("subscriptions")
+            .update({ status: "canceled" })
+            .eq("user_id", userId);
+        } else if (rzpSubId) {
+          await client
+            .from("subscriptions")
+            .update({ status: "canceled" })
+            .eq("razorpay_subscription_id", rzpSubId);
+        }
       } else if (event === "subscription.pending" || event === "subscription.paused") {
-        await client
-          .from("subscriptions")
-          .update({ status: "past_due" })
-          .eq("user_id", userId);
+        if (userId) {
+          await client
+            .from("subscriptions")
+            .update({ status: "past_due" })
+            .eq("user_id", userId);
+        }
       }
     }
 

@@ -2621,13 +2621,29 @@ export async function fetchUserSubscription(userId: string): Promise<DbSubscript
       .limit(1)
       .maybeSingle();
 
-    if (error) {
-      console.warn('fetchUserSubscription note:', error.message || error);
-      return null;
-    }
-    if (data) {
+    if (!error && data) {
       return mapDbSubscription(data);
     }
+
+    // Server-side fallback check (bypasses any client RLS anomalies)
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (token) {
+        const res = await fetch(`/api/subscription/status?userId=${encodeURIComponent(userId)}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const resJson: any = await res.json();
+          if (resJson?.data) {
+            return mapDbSubscription(resJson.data);
+          }
+        }
+      }
+    } catch {
+      // ignore server check error
+    }
+
     return null;
   } catch (err) {
     console.error('fetchUserSubscription exception:', err);

@@ -1,10 +1,16 @@
 import { onRequestPost as createSubPost, onRequestOptions as createSubOptions } from "./functions/api/payment/create-subscription";
 import { onRequestPost as verifySubPost, onRequestOptions as verifySubOptions } from "./functions/api/payment/verify-subscription";
+import { onRequestPost as reconcilePost, onRequestOptions as reconcileOptions } from "./functions/api/payment/reconcile-payment";
 import { onRequestPost as webhookPost } from "./functions/api/payment/razorpay-webhook";
 import { onRequestPost as upgradePost, onRequestOptions as upgradeOptions } from "./functions/api/subscription/upgrade";
 import { onRequestPost as cancelPost, onRequestOptions as cancelOptions } from "./functions/api/subscription/cancel";
 import { onRequestGet as healthGet } from "./functions/api/health";
 import { onRequestGet as configGet, onRequestOptions as configOptions } from "./functions/api/config";
+import { onRequestPost as generatePlanPost, onRequestOptions as generatePlanOptions } from "./functions/api/ai/workout/generate-plan";
+import { onRequestPost as regenerateDayPost, onRequestOptions as regenerateDayOptions } from "./functions/api/ai/workout/regenerate-day";
+import { onRequestPost as generateWorkoutPost, onRequestOptions as generateWorkoutOptions } from "./functions/api/ai/generate-workout";
+import { onRequestPost as macroCalculatePost, onRequestOptions as macroCalculateOptions } from "./functions/api/ai/macro-coach/calculate";
+import { onRequestPost as macroChatPost, onRequestOptions as macroChatOptions } from "./functions/api/ai/macro-coach/chat";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
@@ -116,7 +122,94 @@ export default {
       }
     }
 
-    // 6. Fallback for unmatched API routes
+    // 6. AI Workout Generator routes
+    if (pathname === "/api/ai/workout/generate-plan") {
+      if (method === "POST") {
+        return generatePlanPost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
+    if (pathname === "/api/ai/workout/regenerate-day") {
+      if (method === "POST") {
+        return regenerateDayPost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
+    if (pathname === "/api/ai/generate-workout") {
+      if (method === "POST") {
+        return generateWorkoutPost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
+    // 7. AI Macro Coach routes
+    if (pathname === "/api/ai/macro-coach/calculate") {
+      if (method === "POST") {
+        return macroCalculatePost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
+    if (pathname === "/api/ai/macro-coach/chat") {
+      if (method === "POST") {
+        return macroChatPost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
+    // 8. Fallback for unmatched API routes
     if (pathname.startsWith("/api/")) {
       return new Response(
         JSON.stringify({ error: `API endpoint ${pathname} not found` }),
