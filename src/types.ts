@@ -1400,4 +1400,93 @@ export interface ExamPrepPlan {
   createdAt: string;
 }
 
+// ==========================================
+// AI WORKOUT BUILDER TYPES
+// ==========================================
+
+export interface AIWorkoutExercise {
+  orderIndex: number;
+  name: string;
+  targetMuscle: string;
+  sets: number;
+  reps: string;
+  restTime: string;
+  tempo?: string;
+  formInstructions: string;
+  intensityOrRPE: string;
+  alternativeExercise?: string;
+}
+
+export interface AIWorkoutWarmupDrill {
+  exercise: string;
+  durationOrReps: string;
+  cues: string;
+}
+
+export interface AIWorkoutWarmup {
+  duration: string;
+  routine: AIWorkoutWarmupDrill[];
+}
+
+export interface AIWorkoutCooldownDrill {
+  stretch: string;
+  duration: string;
+  cues: string;
+}
+
+export interface AIWorkoutCooldown {
+  duration: string;
+  routine: AIWorkoutCooldownDrill[];
+}
+
+export interface AIWorkoutDay {
+  dayNumber: number;
+  dayName: string;
+  focusTitle: string;
+  muscleGroups: string[];
+  isRestDay: boolean;
+  duration: string;
+  warmup: AIWorkoutWarmup;
+  exercises: AIWorkoutExercise[];
+  cooldown: AIWorkoutCooldown;
+  coachNotes?: string;
+}
+
+export interface AIWorkoutProgressiveOverload {
+  principles: string[];
+  progressionRule: string;
+  rpeGuidance: string;
+  tempoAdvice: string;
+  deloadStrategy: string;
+}
+
+export interface AIWorkoutPlan {
+  id?: string;
+  planName: string;
+  overview: string;
+  goal: string;
+  experience: string;
+  equipment: string;
+  splitName: string;
+  trainingDaysCount: number;
+  estimatedDuration: string;
+  targetMuscles?: string;
+  progressiveOverloadGuidance: AIWorkoutProgressiveOverload;
+  weeklySchedule: AIWorkoutDay[];
+  created_at?: string;
+}
+
+export interface AIWorkoutRequest {
+  goal: 'Muscle Gain' | 'Fat Loss' | 'Strength' | 'General Fitness';
+  experience: 'Beginner' | 'Intermediate' | 'Advanced';
+  trainingDays: number;
+  duration: string;
+  equipment: 'Full Gym' | 'Dumbbells' | 'Home' | 'Bodyweight';
+  preferredSplit: string;
+  targetMuscles: string[];
+  limitations: string;
+  preferences: string;
+}
+
+
 

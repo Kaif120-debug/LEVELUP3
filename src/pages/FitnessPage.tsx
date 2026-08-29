@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SideNavBar } from '../components/SideNavBar';
+import { AIWorkoutBuilder } from '../components/fitness/AIWorkoutBuilder';
 import { useApp } from '../context/AppContext';
 import { DbWorkoutPlan, DbWorkoutExercise, DbWorkoutLog, DbBodyMeasurement, DbWeightLog } from '../types';
 
@@ -41,7 +42,7 @@ export const FitnessPage: React.FC = () => {
     startCustomWorkout,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'plans' | 'logs' | 'metrics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ai-builder' | 'plans' | 'logs' | 'metrics'>('overview');
 
   // Modals
   const [showWeightModal, setShowWeightModal] = useState(false);
@@ -294,6 +295,13 @@ export const FitnessPage: React.FC = () => {
             </div>
             <div className="flex gap-3 flex-wrap">
               <button
+                onClick={() => setActiveTab('ai-builder')}
+                className="px-4 py-3 font-label-caps bg-primary text-on-primary rounded hover:bg-primary-container transition-colors uppercase cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <span className="material-symbols-outlined text-base">auto_awesome</span>
+                <span>AI Workout Builder</span>
+              </button>
+              <button
                 onClick={() => openAIModal('Analyze my recent workout consistency and propose progression')}
                 className="px-4 py-3 font-label-caps border border-primary text-primary rounded hover:bg-primary-fixed/20 transition-colors uppercase cursor-pointer"
               >
@@ -336,6 +344,17 @@ export const FitnessPage: React.FC = () => {
             >
               <span className="material-symbols-outlined text-sm">dashboard</span>
               <span>Overview & Today</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ai-builder')}
+              className={`pb-3 px-4 text-xs font-label-caps uppercase transition-colors border-b-2 whitespace-nowrap flex items-center gap-2 ${
+                activeTab === 'ai-builder'
+                  ? 'border-primary text-primary font-bold'
+                  : 'border-transparent text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              <span className="material-symbols-outlined text-sm">auto_awesome</span>
+              <span>AI Workout Builder</span>
             </button>
             <button
               onClick={() => setActiveTab('plans')}
@@ -511,43 +530,56 @@ export const FitnessPage: React.FC = () => {
                     ))}
                   </ul>
 
-                  <div className="flex flex-col sm:flex-row gap-4 mt-8">
-                    <button
-                      onClick={() => setShowWorkoutSessionModal(true)}
-                      className="flex-1 py-4 bg-primary-container text-on-primary rounded font-label-caps uppercase hover:bg-primary transition-colors cursor-pointer flex items-center justify-center gap-2"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">play_arrow</span>
-                      Start Workout Session
-                    </button>
-                    <button
-                      onClick={() => setShowCustomizeModal(true)}
-                      className="flex-1 py-4 border border-on-surface rounded font-label-caps uppercase hover:bg-surface-container-low transition-colors cursor-pointer"
-                    >
-                      Customize / AI Protocol
-                    </button>
+                    <div className="flex flex-col sm:flex-row gap-4 mt-8">
+                      <button
+                        onClick={() => setShowWorkoutSessionModal(true)}
+                        className="flex-1 py-4 bg-primary-container text-on-primary rounded font-label-caps uppercase hover:bg-primary transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">play_arrow</span>
+                        Start Workout Session
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('ai-builder')}
+                        className="flex-1 py-4 border border-primary text-primary rounded font-label-caps uppercase hover:bg-primary-fixed/20 transition-colors cursor-pointer flex items-center justify-center gap-2"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        AI Workout Builder
+                      </button>
+                    </div>
                   </div>
-                </div>
 
-                <div
-                  className="lg:col-span-4 rounded-xl border border-surface-variant bg-cover bg-center h-64 lg:h-auto min-h-[360px] shadow-sm relative overflow-hidden flex flex-col justify-end p-6 text-white"
-                  style={{
-                    backgroundImage:
-                      "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.1)), url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop&q=80')",
-                  }}
-                >
-                  <div className="relative z-10">
-                    <span className="text-xs font-bold uppercase tracking-wider text-primary-fixed block mb-1">
-                      Hypertrophy Coach
-                    </span>
-                    <h4 className="font-headline-sm mb-2 text-white">Progressive Overload Principle</h4>
-                    <p className="text-xs text-white/80 leading-relaxed">
-                      Log your working weights and reps each session to trigger continuous muscle protein synthesis and progressive adaptation.
-                    </p>
+                  <div
+                    className="lg:col-span-4 rounded-xl border border-surface-variant bg-cover bg-center h-64 lg:h-auto min-h-[360px] shadow-sm relative overflow-hidden flex flex-col justify-end p-6 text-white"
+                    style={{
+                      backgroundImage:
+                        "linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0.1)), url('https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=800&auto=format&fit=crop&q=80')",
+                    }}
+                  >
+                    <div className="relative z-10">
+                      <span className="text-xs font-bold uppercase tracking-wider text-primary-fixed block mb-1">
+                        Hypertrophy Coach
+                      </span>
+                      <h4 className="font-headline-sm mb-2 text-white">Progressive Overload Principle</h4>
+                      <p className="text-xs text-white/80 leading-relaxed mb-4">
+                        Log your working weights and reps each session to trigger continuous muscle protein synthesis and progressive adaptation.
+                      </p>
+                      <button
+                        onClick={() => setActiveTab('ai-builder')}
+                        className="w-full py-2.5 bg-white/20 backdrop-blur-md hover:bg-white/30 text-white rounded font-label-caps text-xs uppercase transition-colors flex items-center justify-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-sm">auto_awesome</span>
+                        Launch AI Routine Architect
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* TAB: AI WORKOUT BUILDER */}
+            {activeTab === 'ai-builder' && (
+              <AIWorkoutBuilder onPlanActivated={() => setActiveTab('overview')} />
+            )}
 
           {/* TAB 2: WORKOUT PLANS CRUD */}
           {activeTab === 'plans' && (
@@ -559,20 +591,29 @@ export const FitnessPage: React.FC = () => {
                     Manage routine splits, customized compound lifts, target rep ranges, and rest intervals.
                   </p>
                 </div>
-                <button
-                  onClick={() => {
-                    setEditingPlan(null);
-                    setPlanName('');
-                    setPlanGoal('Hypertrophy');
-                    setPlanDuration(45);
-                    setPlanIsActive(true);
-                    setShowPlanModal(true);
-                  }}
-                  className="px-5 py-2.5 bg-primary-container text-on-primary rounded font-label-caps text-xs uppercase hover:bg-primary transition-colors flex items-center gap-1.5"
-                >
-                  <span className="material-symbols-outlined text-[15px]">add</span>
-                  <span>Create Workout Plan</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setActiveTab('ai-builder')}
+                    className="px-4 py-2.5 border border-primary text-primary rounded font-label-caps text-xs uppercase hover:bg-primary-fixed/20 transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
+                    <span>Generate AI Plan</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setEditingPlan(null);
+                      setPlanName('');
+                      setPlanGoal('Hypertrophy');
+                      setPlanDuration(45);
+                      setPlanIsActive(true);
+                      setShowPlanModal(true);
+                    }}
+                    className="px-5 py-2.5 bg-primary-container text-on-primary rounded font-label-caps text-xs uppercase hover:bg-primary transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">add</span>
+                    <span>Create Workout Plan</span>
+                  </button>
+                </div>
               </div>
 
               {workoutPlans.length === 0 ? (

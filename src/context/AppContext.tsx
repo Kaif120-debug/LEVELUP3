@@ -66,6 +66,7 @@ interface AppContextType {
   workoutPlans: DbWorkoutPlan[];
   activeWorkoutPlan: DbWorkoutPlan | null;
   createWorkoutPlan: (plan: { name: string; goal?: string; duration_minutes?: number; is_active?: boolean }, exercises?: Array<{ exercise_name: string; sets?: number; reps?: number; rest_seconds?: number; notes?: string }>) => Promise<DbWorkoutPlan | null>;
+  saveFullAIWorkoutPlan: (aiPlan: any, setActive?: boolean) => Promise<DbWorkoutPlan | null>;
   updateWorkoutPlan: (planId: string, updates: Partial<{ name: string; goal: string; duration_minutes: number; is_active: boolean }>) => Promise<void>;
   deleteWorkoutPlan: (planId: string) => Promise<void>;
   setActiveWorkoutPlan: (planId: string) => Promise<void>;
@@ -972,6 +973,41 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (data) {
       const refreshed = await db.fetchWorkoutPlans(user.id);
       setWorkoutPlans(refreshed);
+    }
+    return data;
+  };
+
+  const saveFullAIWorkoutPlan = async (aiPlan: any, setActive: boolean = true): Promise<DbWorkoutPlan | null> => {
+    if (!user?.id) return null;
+    const { data } = await db.saveAIWorkoutPlan(user.id, aiPlan, setActive);
+    if (data) {
+      const refreshed = await db.fetchWorkoutPlans(user.id);
+      setWorkoutPlans(refreshed);
+
+      // If active, also update today's active protocol in in-memory state
+      if (setActive && aiPlan.weeklySchedule && aiPlan.weeklySchedule.length > 0) {
+        const firstActiveDay = aiPlan.weeklySchedule.find((d: any) => !d.isRestDay) || aiPlan.weeklySchedule[0];
+        if (firstActiveDay && firstActiveDay.exercises) {
+          setState((prev) => ({
+            ...prev,
+            fitness: {
+              ...prev.fitness,
+              todaysProtocol: {
+                title: firstActiveDay.focusTitle || `${aiPlan.planName} - ${firstActiveDay.dayName}`,
+                duration: firstActiveDay.duration || aiPlan.estimatedDuration || '60 mins',
+                intensity: 'High Intensity',
+                exercises: firstActiveDay.exercises.map((e: any, idx: number) => ({
+                  id: `ai-ex-${idx}-${Date.now()}`,
+                  name: e.name,
+                  setsReps: `${e.sets || 3} x ${e.reps || '10'}`,
+                  completed: false,
+                  notes: e.formInstructions || e.tempo || '',
+                })),
+              },
+            },
+          }));
+        }
+      }
     }
     return data;
   };
@@ -2385,6 +2421,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         workoutPlans,
         activeWorkoutPlan,
         createWorkoutPlan,
+        saveFullAIWorkoutPlan,
         updateWorkoutPlan,
         deleteWorkoutPlan,
         setActiveWorkoutPlan,

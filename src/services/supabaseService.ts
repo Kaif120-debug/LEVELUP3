@@ -444,6 +444,104 @@ export async function createWorkoutPlan(
   }
 }
 
+export async function saveAIWorkoutPlan(
+  userId: string,
+  aiPlan: any,
+  setActive: boolean = true
+): Promise<{ data: DbWorkoutPlan | null; error: Error | null }> {
+  try {
+    if (setActive) {
+      await supabase.from('workout_plans').update({ is_active: false }).eq('user_id', userId);
+    }
+
+    const durationNum = parseInt(aiPlan.estimatedDuration || '60', 10) || 60;
+    
+    // Store complete plan metadata in goal as JSON string for complete fidelity
+    const planMeta = {
+      overview: aiPlan.overview,
+      goal: aiPlan.goal,
+      experience: aiPlan.experience,
+      equipment: aiPlan.equipment,
+      splitName: aiPlan.splitName,
+      trainingDaysCount: aiPlan.trainingDaysCount,
+      targetMuscles: aiPlan.targetMuscles,
+      progressiveOverloadGuidance: aiPlan.progressiveOverloadGuidance,
+      weeklySchedule: aiPlan.weeklySchedule,
+    };
+
+    const { data: newPlan, error: planError } = await supabase
+      .from('workout_plans')
+      .insert({
+        user_id: userId,
+        name: aiPlan.planName || 'AI Workout Protocol',
+        goal: JSON.stringify(planMeta),
+        duration_minutes: durationNum,
+        is_active: setActive,
+      })
+      .select()
+      .single();
+
+    if (planError || !newPlan) throw planError || new Error('Failed to create AI workout plan');
+
+    // Flatten all exercises across all schedule days
+    const exercisesPayload: any[] = [];
+    (aiPlan.weeklySchedule || []).forEach((day: any, dayIdx: number) => {
+      if (day.exercises && day.exercises.length > 0) {
+        day.exercises.forEach((ex: any, exIdx: number) => {
+          const repsClean = parseInt(String(ex.reps || '10').replace(/\D/g, ''), 10) || 10;
+          const restClean = parseInt(String(ex.restTime || '90').replace(/\D/g, ''), 10) || 90;
+          
+          const exNotes = JSON.stringify({
+            dayNumber: day.dayNumber || dayIdx + 1,
+            dayName: day.dayName || `Day ${dayIdx + 1}`,
+            focusTitle: day.focusTitle,
+            formInstructions: ex.formInstructions,
+            tempo: ex.tempo,
+            intensityOrRPE: ex.intensityOrRPE,
+            alternativeExercise: ex.alternativeExercise,
+            warmup: day.warmup,
+            cooldown: day.cooldown,
+            coachNotes: day.coachNotes,
+          });
+
+          exercisesPayload.push({
+            workout_plan_id: newPlan.id,
+            exercise_name: ex.name,
+            sets: Number(ex.sets) || 3,
+            reps: repsClean,
+            rest_seconds: restClean,
+            notes: exNotes,
+            order_index: ex.orderIndex || exIdx + 1,
+          });
+        });
+      }
+    });
+
+    let createdExercises: DbWorkoutExercise[] = [];
+    if (exercisesPayload.length > 0) {
+      const { data: insertedEx, error: exError } = await supabase
+        .from('workout_exercises')
+        .insert(exercisesPayload)
+        .select();
+
+      if (exError) console.warn('Error inserting AI workout exercises:', exError.message);
+      createdExercises = insertedEx || [];
+    }
+
+    return {
+      data: {
+        ...newPlan,
+        exercises: createdExercises,
+      },
+      error: null,
+    };
+  } catch (err: any) {
+    console.error('saveAIWorkoutPlan error:', err);
+    return { data: null, error: err };
+  }
+}
+
+
 export async function updateWorkoutPlan(
   planId: string,
   updates: Partial<{ name: string; goal: string; duration_minutes: number; is_active: boolean }>
