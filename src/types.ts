@@ -656,7 +656,7 @@ export interface ContentPost {
   id: string;
   day: number;
   title: string;
-  platform: 'X' | 'YouTube' | 'LinkedIn' | 'TikTok' | 'Blog';
+  platform: 'X' | 'Instagram' | 'YouTube' | 'LinkedIn' | 'TikTok' | 'Blog';
   status: 'Draft' | 'Scheduled' | 'Published';
   colorTag?: string;
 }

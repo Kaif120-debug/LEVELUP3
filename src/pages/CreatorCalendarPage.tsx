@@ -20,7 +20,8 @@ export const CreatorCalendarPage: React.FC = () => {
     if (!postTitle.trim()) return;
 
     let colorTag = 'bg-surface-variant';
-    if (postPlatform === 'YouTube') colorTag = 'bg-error-container';
+    if (postPlatform === 'Instagram') colorTag = 'bg-tertiary-container text-on-tertiary-container';
+    else if (postPlatform === 'YouTube') colorTag = 'bg-error-container';
     else if (postPlatform === 'LinkedIn') colorTag = 'bg-primary-fixed/40';
     else if (postPlatform === 'TikTok') colorTag = 'bg-secondary-container';
 
@@ -214,6 +215,7 @@ export const CreatorCalendarPage: React.FC = () => {
                       className="w-full border border-outline-variant rounded-lg p-2.5 text-sm bg-surface-container-lowest"
                     >
                       <option value="X">X (Twitter)</option>
+                      <option value="Instagram">Instagram</option>
                       <option value="YouTube">YouTube</option>
                       <option value="LinkedIn">LinkedIn</option>
                       <option value="TikTok">TikTok</option>
