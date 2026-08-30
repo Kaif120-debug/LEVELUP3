@@ -91,7 +91,12 @@ async function callGeminiCascade(
   const ai = getAI();
   if (!ai) return null;
 
-  const candidateModels = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  const candidateModels = [
+    "gemini-3.1-flash-lite",
+    "gemini-3.7-flash",
+    "gemini-3.6-flash",
+    "gemini-flash-latest",
+  ];
 
   for (const model of candidateModels) {
     try {
@@ -1320,6 +1325,10 @@ Return a JSON object:
 
 // AI Workout Plan Generator (Full Weekly Periodized Plan)
 app.post("/api/ai/workout/generate-plan", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
+  res.setHeader("Pragma", "no-cache");
+  res.setHeader("Expires", "0");
+
   const {
     goal = "Muscle Gain",
     experience = "Intermediate",
@@ -1332,12 +1341,18 @@ app.post("/api/ai/workout/generate-plan", async (req, res) => {
     preferences = "",
     regenerationCount = 0,
     previousPlan = null,
+    requestId = "",
   } = req.body || {};
 
   const numDays = Math.max(2, Math.min(7, Number(trainingDays) || 4));
-  const targetMusclesStr = Array.isArray(targetMuscles) && targetMuscles.length > 0
-    ? targetMuscles.join(", ")
-    : "Comprehensive Balanced Development";
+  const targetMusclesList = Array.isArray(targetMuscles) ? targetMuscles : (targetMuscles ? [targetMuscles] : []);
+  const targetMusclesStr = targetMusclesList.length > 0
+    ? targetMusclesList.join(", ")
+    : "Comprehensive Balanced Full Body Development";
+
+  const seed = `${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  const genId = `gen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+  const effectiveRequestId = requestId || `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
   // Dynamic Procedural Fallback generator in case of network or rate limits
   const generateProceduralFallbackPlan = () => {
@@ -1685,54 +1700,60 @@ ${previousPlan.weeklySchedule.map((d: any) => `Day ${d.dayNumber} (${d.focusTitl
 `
     : "";
 
-  const prompt = `You are the Lead Sports Physiologist, CSCS Strength Coach, and Master Trainer for LEVELUP Fitness OS.
-Design a world-class, scientific, periodized, evidence-based weekly workout plan strictly customized to the user's specific profile:
+  const prompt = `You are a World-Class Sports Physiologist and CSCS Strength & Conditioning Coach for LEVELUP Fitness OS.
+Design a completely customized, evidence-based, periodized weekly workout plan adhering strictly to the user's specific inputs:
 
-USER PROFILE & CONSTRAINTS:
-- Primary Fitness Goal: ${goal} (e.g., Muscle Gain / Hypertrophy, Fat Loss / Body Recomposition, Max Strength, General Fitness)
-- Training Experience Level: ${experience} (Beginner / Intermediate / Advanced)
-- Training Frequency: Exactly ${numDays} training days per week
-- Target Workout Duration: ${duration}
-- Available Equipment: ${equipment} (Full Gym / Dumbbells / Home / Bodyweight)
-- Preferred Split: ${preferredSplit}
-- Target Muscle Groups Focus: ${targetMusclesStr}
-- Medical/Physical Limitations & Injuries: ${limitations || "None reported"}
-- Special Preferences / Requests: ${preferences || "Focus on optimal biomechanics and joint longevity"}
-- Iteration / Regeneration Count: ${regenerationCount}
-
+USER PROFILE & CONSTRAINTS (Generation Token: ${seed}):
+- Goal: ${goal}
+- Experience Level: ${experience}
+- Training Frequency: EXACTLY ${numDays} training days in the weekly schedule (Day 1 through Day ${numDays})
+- Session Duration: ${duration}
+- Available Equipment: ${equipment}
+- Preferred Split Architecture: ${preferredSplit}
+- Target Muscle Focus: ${targetMusclesStr}
+- Physical Limitations / Injuries: ${limitations || "None"}
+- Coaching Preferences / Notes: ${preferences || "Optimize for hypertrophy, strength, and biomechanical joint longevity"}
+- Iteration: ${regenerationCount}
 ${previousPlanContext}
 
-CRITICAL ARCHITECTURAL REQUIREMENTS:
-1. "weeklySchedule" MUST contain exactly ${numDays} structured day objects (Day 1 to Day ${numDays}).
-2. For each day, provide:
-   - "dayNumber": 1, 2, etc.
-   - "dayName": "Day 1 - Monday", etc.
-   - "focusTitle": Specific descriptive training focus (e.g. "Upper Body Strength & Power", "Legs & Posterior Chain Hypertrophy")
-   - "muscleGroups": Array of target muscle strings (e.g. ["Chest", "Front Delts", "Triceps"])
-   - "isRestDay": boolean
-   - "duration": "${duration}"
-   - "warmup": { "duration": "8 mins", "routine": [ { "exercise": "name", "durationOrReps": "e.g. 2 x 15", "cues": "concise mobility cue" } ] } (3-4 specific dynamic mobility & activation drills)
-   - "exercises": Array of 4-6 exercises arranged in optimal biomechanical order (compound heavy movements first, isolation and metabolite pump work last).
-     Each exercise MUST have:
-     * "orderIndex": 1, 2, 3...
-     * "name": Exercise name matching ${equipment}
-     * "targetMuscle": Specific anatomical muscle head
-     * "sets": Integer (e.g. 3 or 4)
-     * "reps": String with target rep range (e.g. "6-8 reps", "8-10 reps", "12-15 reps")
-     * "restTime": String (e.g. "90-120 sec", "60 sec")
-     * "tempo": Tempo notation string (e.g. "3-1-1-0", "2-0-1-1")
-     * "formInstructions": Detailed, concise step-by-step coaching cue explaining proper setup, joint angles, breathing, and common flaws to avoid so user performs it with flawless biomechanics.
-     * "intensityOrRPE": String (e.g. "RPE 8 (2 RIR)", "RPE 9 (1 RIR)")
-     * "alternativeExercise": Smart equipment/injury alternative
-   - "cooldown": { "duration": "5 mins", "routine": [ { "stretch": "name", "duration": "45s per side", "cues": "recovery cues" } ] }
-   - "coachNotes": Practical coaching takeaway for the session.
-3. "progressiveOverloadGuidance": Include actionable double progression rules, RPE guidelines, tempo advice, and deload protocols.
-4. Strictly respect the user's limitations (${limitations || "None"}) and available equipment (${equipment}). Never prescribe barbells if equipment is Dumbbells or Bodyweight.
+STRICT PROGRAMMING DIRECTIVES BY SELECTION:
+1. GOAL DIFFERENTIATION:
+   - "Muscle Gain" (Hypertrophy): 8-12 / 10-15 reps, 3-4 working sets, high mechanical tension with controlled stretch (3-0-1-0 tempo), 60-90s rest, target 1-2 RIR (RPE 8-9).
+   - "Fat Loss" (Metabolic Recomposition): 12-18 reps, 3-4 sets, shorter rest intervals (45-60s), higher density, compound movements paired with core/metabolic stimulus, 2-0-1-0 tempo.
+   - "Strength" (Maximum Neural Drive): 3-6 reps on main compound lifts, 4-5 sets, heavy load (80-90% 1RM), explosive concentric (3-1-X-0 tempo), 120-180s rest, RPE 7.5-8.5.
+   - "General Fitness" (Functional Longevity): 8-12 reps, 3 sets, 60-90s rest, multi-planar functional patterns (squat, hinge, push, pull, rotate, carry), joint mobility integration.
+
+2. EXPERIENCE LEVEL DIFFERENTIATION:
+   - "Beginner": 4-5 foundational exercises per day, 2-3 sets per exercise, focus on pristine movement literacy, conservative RPE (RPE 6.5-7.5, 2-3 RIR), linear progression rules.
+   - "Intermediate": 5-6 exercises per day, 3-4 sets per exercise, double-progression model, variation in angles, RPE 7.5-8.5 (1-2 RIR).
+   - "Advanced": 6-7 exercises per day, 3-5 sets, advanced periodization, higher volume on target muscle groups, intensity techniques where appropriate, RPE 8.5-9.5 (0-1 RIR).
+
+3. DURATION CALIBRATION:
+   - "30 mins": 3-4 compact, high-efficiency exercises, concise 3 min dynamic warm-up, 45-60s rest times.
+   - "45 mins": 4-5 exercises, 5 min warm-up, 60-75s rest.
+   - "60 mins": 5-6 exercises, 8 min warm-up, 75-90s rest.
+   - "75 mins": 6-7 exercises, 8 min warm-up, primary strength + secondary isolation work, 90-120s rest.
+   - "90 mins": 7-8 exercises, comprehensive warm-up, heavy compounds + specialized isolation pump + core/mobility finish.
+
+4. EQUIPMENT CONSTRAINTS (MANDATORY):
+   - "Full Gym": Barbells, dumbbells, cables, selectorized machines, leg press, hack squat, smith machine.
+   - "Dumbbells": Dumbbells, adjustable bench, bodyweight/pull-up bar ONLY. Strictly NO barbell or cable machine exercises.
+   - "Home": Resistance bands, dumbbells, pull-up bar, bodyweight, chairs/sturdy furniture. Strictly NO commercial heavy machinery.
+   - "Bodyweight": Calisthenics ONLY (push-up variations, pull-ups, dips, pike push-ups, pistol/Bulgarian squats, inverted rows, planks, hollow body). Strictly NO weights or machines.
+
+5. TARGET MUSCLE FOCUS:
+   - Prioritize these target muscles (${targetMusclesStr}) with first-order placement in sessions, extra set volume, and specific isolation angles.
+
+6. LIMITATIONS:
+   - Respect: "${limitations || "None"}". Never prescribe movements that aggravate stated injuries.
+
+7. EXACT SCHEDULE STRUCTURE:
+   - "weeklySchedule" MUST contain exactly ${numDays} day objects (Day 1 through Day ${numDays}).
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "planName": "Descriptive plan title",
-  "overview": "Scientific rationale and stimulus breakdown",
+  "planName": "Creative, specific plan title reflecting goal and split",
+  "overview": "Detailed 2-3 sentence scientific summary explaining the stimulus and rationale",
   "goal": "${goal}",
   "experience": "${experience}",
   "equipment": "${equipment}",
@@ -1741,47 +1762,47 @@ Return ONLY a valid JSON object matching this schema:
   "estimatedDuration": "${duration}",
   "targetMuscles": "${targetMusclesStr}",
   "progressiveOverloadGuidance": {
-    "principles": ["Rule 1", "Rule 2", "Rule 3"],
-    "progressionRule": "Exact double progression rule",
-    "rpeGuidance": "RPE roadmap across training block",
-    "tempoAdvice": "Tempo guide",
-    "deloadStrategy": "Deload timing and execution"
+    "principles": ["Principle 1", "Principle 2", "Principle 3"],
+    "progressionRule": "Specific actionable progression rule for increasing weight or reps",
+    "rpeGuidance": "Clear RPE guidelines across the training week",
+    "tempoAdvice": "Tempo guide (e.g. 3-0-1-0 eccentric control)",
+    "deloadStrategy": "Deload timing and load reduction protocol"
   },
   "weeklySchedule": [
     {
       "dayNumber": 1,
       "dayName": "Day 1 - Monday",
-      "focusTitle": "Session Title",
+      "focusTitle": "Descriptive Session Focus Title",
       "muscleGroups": ["Muscle 1", "Muscle 2"],
       "isRestDay": false,
       "duration": "${duration}",
       "warmup": {
         "duration": "8 mins",
         "routine": [
-          { "exercise": "Drill name", "durationOrReps": "2 x 12", "cues": "Mobility cues" }
+          { "exercise": "Drill Name", "durationOrReps": "2 x 12", "cues": "Activation cue" }
         ]
       },
       "exercises": [
         {
           "orderIndex": 1,
           "name": "Exercise Name",
-          "targetMuscle": "Muscle head",
+          "targetMuscle": "Specific muscle head",
           "sets": 4,
           "reps": "8-10 reps",
           "restTime": "90 sec",
-          "tempo": "3-1-1-0",
-          "formInstructions": "Detailed biomechanical step-by-step coaching cue.",
+          "tempo": "3-0-1-0",
+          "formInstructions": "Clear, step-by-step biomechanical execution cue with setup and breathing.",
           "intensityOrRPE": "RPE 8 (2 RIR)",
-          "alternativeExercise": "Alternative name"
+          "alternativeExercise": "Viable alternative"
         }
       ],
       "cooldown": {
         "duration": "5 mins",
         "routine": [
-          { "stretch": "Stretch name", "duration": "45s", "cues": "Breathing cues" }
+          { "stretch": "Stretch Name", "duration": "45s", "cues": "Parasympathetic breathing" }
         ]
       },
-      "coachNotes": "Key takeaway for today."
+      "coachNotes": "Key coaching tip for today's session."
     }
   ]
 }`;
@@ -1794,19 +1815,71 @@ Return ONLY a valid JSON object matching this schema:
 
     if (result?.text) {
       const parsed = JSON.parse(result.text.trim());
-      if (parsed && parsed.weeklySchedule && parsed.weeklySchedule.length > 0) {
+      if (parsed && parsed.weeklySchedule && Array.isArray(parsed.weeklySchedule) && parsed.weeklySchedule.length > 0) {
+        parsed.id = parsed.id || `plan_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        parsed.generationId = genId;
+        parsed.requestId = effectiveRequestId;
+        parsed.created_at = new Date().toISOString();
+        parsed.goal = parsed.goal || goal;
+        parsed.experience = parsed.experience || experience;
+        parsed.equipment = parsed.equipment || equipment;
+        parsed.splitName = parsed.splitName || preferredSplit;
+        parsed.trainingDaysCount = parsed.weeklySchedule.length;
+        parsed.estimatedDuration = parsed.estimatedDuration || duration;
+
+        // Ensure exercise indices and day numbers are sequential and well-formatted
+        parsed.weeklySchedule = parsed.weeklySchedule.slice(0, numDays).map((day: any, idx: number) => ({
+          dayNumber: idx + 1,
+          dayName: day.dayName || `Day ${idx + 1}`,
+          focusTitle: day.focusTitle || `${preferredSplit} - Day ${idx + 1}`,
+          muscleGroups: Array.isArray(day.muscleGroups) ? day.muscleGroups : ["Full Body"],
+          isRestDay: Boolean(day.isRestDay),
+          duration: day.duration || duration,
+          warmup: day.warmup || {
+            duration: "5 mins",
+            routine: [
+              { exercise: "Dynamic Joint Rotations & Movement Prep", durationOrReps: "2 sets x 10 reps", cues: "Open joint angles" }
+            ]
+          },
+          exercises: (day.exercises || []).map((ex: any, exIdx: number) => ({
+            orderIndex: exIdx + 1,
+            name: ex.name || "Compound Movement",
+            targetMuscle: ex.targetMuscle || "Target Muscle",
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || "8-12 reps"),
+            restTime: String(ex.restTime || "90 sec"),
+            tempo: String(ex.tempo || "3-0-1-0"),
+            formInstructions: String(ex.formInstructions || "Maintain controlled tempo throughout the rep."),
+            intensityOrRPE: String(ex.intensityOrRPE || "RPE 8"),
+            alternativeExercise: ex.alternativeExercise || ""
+          })),
+          cooldown: day.cooldown || {
+            duration: "5 mins",
+            routine: [
+              { stretch: "Static Full-Body Stretch", duration: "45s per side", cues: "Slow deep breathing" }
+            ]
+          },
+          coachNotes: day.coachNotes || "Focus on progressive overload and consistent tempo.",
+        }));
+
         return res.json(parsed);
       }
     }
-    return res.json(generateProceduralFallbackPlan());
+
+    return res.status(503).json({
+      error: "AI Workout Generation service was unable to generate a plan for the specified parameters. Please try again.",
+    });
   } catch (err: any) {
-    console.warn("[AI Workout Generate Plan Exception]:", err.message);
-    return res.json(generateProceduralFallbackPlan());
+    console.error("[AI Workout Generate Plan Exception]:", err?.message);
+    return res.status(500).json({
+      error: err?.message || "Failed to generate AI workout plan. Please try again.",
+    });
   }
 });
 
 // AI Single Day Regeneration / Customization Endpoint
 app.post("/api/ai/workout/regenerate-day", async (req, res) => {
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
   const {
     planContext = {},
     dayNumber = 1,
@@ -1816,8 +1889,10 @@ app.post("/api/ai/workout/regenerate-day", async (req, res) => {
     userFeedback = "",
   } = req.body || {};
 
+  const seed = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
   const prompt = `You are the Lead Sports Physiologist for LEVELUP Fitness OS.
 The user wants to REGENERATE / CUSTOMIZE a specific workout day in their training program based on their custom instructions.
+(Token: ${seed})
 
 PLAN CONTEXT:
 - Goal: ${planContext.goal || "Muscle Gain"}
@@ -1837,7 +1912,7 @@ USER'S CUSTOM ADJUSTMENT / FEEDBACK:
 "${userFeedback || "Generate a fresh, challenging variation with optimal exercise selection"}"
 
 REQUIREMENTS:
-1. Provide an updated Day object adhering to the user's feedback.
+1. Provide an updated Day object strictly adhering to the user's feedback, equipment constraints (${planContext.equipment || "Full Gym"}), and training experience (${planContext.experience || "Intermediate"}).
 2. Include 4-6 exercises with orderIndex, name, targetMuscle, sets, reps, restTime, tempo, formInstructions (concise step-by-step form execution instructions), intensityOrRPE, and alternativeExercise.
 3. Include dynamic warmup routine and cool-down routine.
 4. Return ONLY a valid JSON object matching this schema:
@@ -1845,7 +1920,7 @@ REQUIREMENTS:
 {
   "dayNumber": ${dayNumber},
   "dayName": "${dayName}",
-  "focusTitle": "Updated or Refined Session Title",
+  "focusTitle": "Updated Session Title",
   "muscleGroups": ["Muscle 1", "Muscle 2"],
   "isRestDay": false,
   "duration": "${planContext.duration || "60 mins"}",
@@ -1878,86 +1953,6 @@ REQUIREMENTS:
   "coachNotes": "Specific coaching cue based on the modifications requested."
 }`;
 
-  // Procedural fallback generator for single day customization
-  const generateProceduralDayFallback = () => {
-    const eq = planContext.equipment || "Full Gym";
-    const isHome = eq === "Home" || eq === "Bodyweight";
-    const isDumbbell = eq === "Dumbbells";
-
-    return {
-      dayNumber: Number(dayNumber) || 1,
-      dayName: dayName || "Day 1",
-      focusTitle: currentFocusTitle ? `${currentFocusTitle} (Customized)` : "Custom Target Session",
-      muscleGroups: ["Target Muscle Groups", "Core", "Synergists"],
-      isRestDay: false,
-      duration: planContext.duration || "60 mins",
-      warmup: {
-        duration: "8 mins",
-        routine: [
-          { exercise: "Dynamic Joint Rotations & Arm Circles", durationOrReps: "2 sets x 12 reps", cues: "Lubricate target joints through full active range" },
-          { exercise: "Target Muscle Band Activation", durationOrReps: "2 sets x 15 reps", cues: "Prime neuromuscular connections and increase local blood flow" },
-        ],
-      },
-      exercises: [
-        {
-          orderIndex: 1,
-          name: isHome ? "Decline / Incline Push-ups" : isDumbbell ? "Dumbbell Press / Row Compound" : "Heavy Compound Movement",
-          targetMuscle: "Primary Muscle Group",
-          sets: 4,
-          reps: "8-10 reps",
-          restTime: "90-120 sec",
-          tempo: "3-1-1-0",
-          formInstructions: "Execute with strict control on 3-second eccentric phase. Keep core braced firmly throughout.",
-          intensityOrRPE: "RPE 8.5 (1-2 RIR)",
-          alternativeExercise: "Machine or Dumbbell alternative",
-        },
-        {
-          orderIndex: 2,
-          name: isHome ? "Inverted Row / Pike Push-up" : "Target Angle Hypertrophy Exercise",
-          targetMuscle: "Secondary Target Zone",
-          sets: 4,
-          reps: "10-12 reps",
-          restTime: "90 sec",
-          tempo: "2-0-1-1",
-          formInstructions: "Focus on maximum peak contraction with 1-second pause at top.",
-          intensityOrRPE: "RPE 8.5",
-          alternativeExercise: "Cable variation",
-        },
-        {
-          orderIndex: 3,
-          name: "Unilateral Target Isolation Movement",
-          targetMuscle: "Target Muscle Specialization",
-          sets: 3,
-          reps: "12-15 reps",
-          restTime: "60 sec",
-          tempo: "2-1-1-0",
-          formInstructions: "Eliminate all body sway; isolate target muscle with continuous tension.",
-          intensityOrRPE: "RPE 9 (1 RIR)",
-          alternativeExercise: "Resistance Band alternative",
-        },
-        {
-          orderIndex: 4,
-          name: "Metabolic Burnout / Pump Finisher",
-          targetMuscle: "Metabolite Accumulation",
-          sets: 3,
-          reps: "15-20 reps",
-          restTime: "45-60 sec",
-          tempo: "2-0-1-0",
-          formInstructions: "Controlled tempo with full range of motion. Emphasize mind-muscle connection.",
-          intensityOrRPE: "RPE 9.5 (0-1 RIR)",
-          alternativeExercise: "Bodyweight Finisher",
-        },
-      ],
-      cooldown: {
-        duration: "5 mins",
-        routine: [
-          { stretch: "Target Muscle Static Stretch", duration: "60s per side", cues: "Slow deep nasal breathing to lower heart rate and reduce cortisol" },
-        ],
-      },
-      coachNotes: userFeedback ? `Modified according to feedback: "${userFeedback}". Keep progressive overload consistent.` : "Focused session designed for maximum localized stimulus.",
-    };
-  };
-
   try {
     const result = await callGeminiCascade(prompt, {
       responseMimeType: "application/json",
@@ -1966,62 +1961,57 @@ REQUIREMENTS:
 
     if (result?.text) {
       const parsed = JSON.parse(result.text.trim());
-      if (parsed && parsed.exercises && parsed.exercises.length > 0) {
+      if (parsed && parsed.exercises && Array.isArray(parsed.exercises) && parsed.exercises.length > 0) {
+        parsed.dayNumber = Number(dayNumber) || 1;
+        parsed.dayName = dayName || `Day ${dayNumber}`;
         return res.json(parsed);
       }
     }
-    return res.json(generateProceduralDayFallback());
+    return res.status(503).json({ error: "Unable to regenerate workout day. Please try again." });
   } catch (err: any) {
-    console.warn("[AI Workout Regenerate Day Exception]:", err.message);
-    return res.json(generateProceduralDayFallback());
+    console.error("[AI Workout Regenerate Day Exception]:", err?.message);
+    return res.status(500).json({ error: err?.message || "Failed to regenerate day." });
   }
 });
 
 // AI Workout Plan Generator (Legacy Compatible Single Protocol)
 app.post("/api/ai/generate-workout", async (req, res) => {
-  const { splitType, targetMuscle, fitnessLevel, duration, equipment, limitations } = req.body;
+  res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate");
+  const { splitType, targetMuscle, fitnessLevel, duration, equipment, limitations, goal } = req.body || {};
 
-  const fallback = {
-    protocolName: `${targetMuscle || "Upper Body"} Hypertrophy Protocol`,
-    duration: duration || "45 mins",
-    intensity: "High Intensity",
-    exercises: [
-      { name: "Incline Dumbbell Press", setsReps: "4 x 8-10", notes: "Focus on 3-second eccentric contraction" },
-      { name: "Lat Pulldown (Neutral Grip)", setsReps: "4 x 10-12", notes: "Full stretch at top of movement" },
-      { name: "Seated Cable Row", setsReps: "3 x 12", notes: "Squeeze lats for 1 second" },
-      { name: "Cable Lateral Raises", setsReps: "3 x 15", notes: "Control the descent" },
-      { name: "Overhead Rope Triceps Extension", setsReps: "3 x 12", notes: "Keep elbows stationary" },
-    ],
-  };
+  const seed = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const prompt = `You are a Lead Exercise Scientist for LEVELUP Fitness OS. (Token: ${seed})
+Create a science-based custom workout protocol strictly adapted to:
+- Goal: ${goal || "Muscle Gain / Hypertrophy"}
+- Focus / Muscle: ${targetMuscle || "Full Body"}
+- Split: ${splitType || "Push/Pull/Legs"}
+- Experience Level: ${fitnessLevel || "Intermediate"}
+- Equipment: ${equipment || "Full Gym"}
+- Target Duration: ${duration || "45 mins"}
+- Limitations: ${limitations || "None"}
+
+Return ONLY a valid JSON object matching this schema:
+{
+  "protocolName": "Workout title reflecting specific muscle and split",
+  "duration": "${duration || "45 mins"}",
+  "intensity": "High Intensity / Moderate / Controlled",
+  "exercises": [
+    { "name": "Exercise name", "setsReps": "4 x 8-10", "notes": "Specific form cue" }
+  ]
+}`;
 
   try {
-    const result = await callGeminiCascade(
-      `Create a science-based hypertrophy workout protocol:
-Focus: ${targetMuscle || "Upper Body"}
-Split: ${splitType || "Push/Pull/Legs"}
-Level: ${fitnessLevel || "Intermediate/Advanced"}
-Equipment: ${equipment || "Full Gym"}
-Limitations: ${limitations || "None"}
-
-Return a JSON object:
-{
-  "protocolName": "Workout title",
-  "duration": "Duration (e.g. 45 min)",
-  "intensity": "Intensity label",
-  "exercises": [
-    { "name": "Exercise name", "setsReps": "e.g. 4 x 8-10", "notes": "Form cue" }
-  ]
-}`,
-      { responseMimeType: "application/json" }
-    );
+    const result = await callGeminiCascade(prompt, { responseMimeType: "application/json" });
 
     if (result?.text) {
       const parsed = JSON.parse(result.text.trim());
-      return res.json(parsed);
+      if (parsed && parsed.exercises && parsed.exercises.length > 0) {
+        return res.json(parsed);
+      }
     }
-    return res.json(fallback);
-  } catch (error) {
-    return res.json(fallback);
+    return res.status(503).json({ error: "Failed to generate workout protocol." });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "Failed to generate workout protocol." });
   }
 });
 
