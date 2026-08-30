@@ -1358,6 +1358,381 @@ Return a JSON object:
   }
 });
 
+// Comprehensive movement database for diverse exercise selection & fallback
+const WORKOUT_EXERCISE_CATALOG: Record<string, Array<{
+  name: string;
+  targetMuscle: string;
+  equipment: "Full Gym" | "Dumbbells" | "Home" | "Bodyweight";
+  formInstructions: string;
+  intensityOrRPE: string;
+  alternativeExercise: string;
+}>> = {
+  chest_flat: [
+    {
+      name: "Barbell Flat Bench Press",
+      targetMuscle: "Pectoralis Major (Sternal & Costal Heads)",
+      equipment: "Full Gym",
+      formInstructions: "Retract and depress scapulae. Lower bar under 3s control to mid-sternum, then drive up explosively.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Flat Dumbbell Press",
+    },
+    {
+      name: "Flat Dumbbell Bench Press",
+      targetMuscle: "Pectoralis Major (Mid & Outer Fibers)",
+      equipment: "Dumbbells",
+      formInstructions: "Stack wrists over elbows. Lower dumbbells to 45-degree angle to torso for deep stretch, press in converging arc.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Dumbbell Floor Press",
+    },
+    {
+      name: "Standard Push-ups with 2s Deficit Pause",
+      targetMuscle: "Pectoralis Major & Anterior Deltoid",
+      equipment: "Bodyweight",
+      formInstructions: "Rigid plank alignment. Lower chest to floor with elbows at 45 degrees, pause for 2s at bottom, press up.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Elevated Push-ups",
+    },
+    {
+      name: "Chest-Focused Parallel Bar Dips",
+      targetMuscle: "Lower Pectoralis Major & Triceps",
+      equipment: "Full Gym",
+      formInstructions: "Lean torso forward 30 degrees. Descend until shoulders reach elbow depth, press forcefully through palms.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Decline Dumbbell Press",
+    },
+    {
+      name: "Floor Dumbbell Chest Press",
+      targetMuscle: "Pectoralis Major & Triceps",
+      equipment: "Dumbbells",
+      formInstructions: "Lie on floor with knees bent. Lower triceps to lightly touch floor, pause 1s, press up.",
+      intensityOrRPE: "RPE 8",
+      alternativeExercise: "Push-ups",
+    },
+  ],
+  chest_incline: [
+    {
+      name: "Incline Dumbbell Bench Press (30° Angle)",
+      targetMuscle: "Clavicular Pectoralis Major (Upper Chest)",
+      equipment: "Full Gym",
+      formInstructions: "Set bench to 30 degrees. Lower dumbbells until level with upper chest for deep stretch, press up smoothly.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Incline Barbell Press",
+    },
+    {
+      name: "Low-to-High Cable Chest Flyes",
+      targetMuscle: "Clavicular Head & Inner Pectoralis",
+      equipment: "Full Gym",
+      formInstructions: "Cables at bottom pulleys. Scoop handles upward and together to chin height, squeezing upper chest for 1s.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Incline Dumbbell Flyes",
+    },
+    {
+      name: "Incline Dumbbell Fly-Press",
+      targetMuscle: "Upper Pectoralis Major (Stretch-Mediated)",
+      equipment: "Dumbbells",
+      formInstructions: "Lower out wide for deep stretch, tuck elbows slightly on the way up to press.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Flat Dumbbell Flyes",
+    },
+    {
+      name: "Decline Push-ups (Feet Elevated on Box)",
+      targetMuscle: "Upper Pectoralis & Anterior Deltoid",
+      equipment: "Bodyweight",
+      formInstructions: "Feet elevated on chair or box. Keep core braced, lower chest toward ground, press up.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Standard Push-ups",
+    },
+  ],
+  shoulders_press: [
+    {
+      name: "Standing Overhead Barbell Press (OHP)",
+      targetMuscle: "Anterior Deltoids & Triceps",
+      equipment: "Full Gym",
+      formInstructions: "Squeeze glutes and brace abs. Press barbell vertically clearing chin, lock out overhead.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Seated Dumbbell Overhead Press",
+    },
+    {
+      name: "Seated Dumbbell Shoulder Press",
+      targetMuscle: "Anterior & Lateral Deltoids",
+      equipment: "Dumbbells",
+      formInstructions: "Sit with back supported. Press dumbbells upward in a slight natural arc, locking out overhead.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Standing Dumbbell Press",
+    },
+    {
+      name: "Dumbbell Arnold Press",
+      targetMuscle: "Anterior & Lateral Deltoids (Rotational)",
+      equipment: "Dumbbells",
+      formInstructions: "Start with dumbbells at collarbones with palms facing you. Rotate wrists outward as you press overhead.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Seated DB Press",
+    },
+    {
+      name: "Elevated Pike Push-ups",
+      targetMuscle: "Anterior Deltoids & Triceps",
+      equipment: "Bodyweight",
+      formInstructions: "Elevate feet on bench, hips bent 90 degrees. Lower top of head toward floor between hands, press up.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Standard Pike Push-ups",
+    },
+  ],
+  shoulders_lateral: [
+    {
+      name: "Cable Lateral Raises (Behind the Back / Cuff)",
+      targetMuscle: "Lateral Deltoids (Side Delts)",
+      equipment: "Full Gym",
+      formInstructions: "Attach cable cuff to wrist. Step forward of pulley, raise arm out to 90 degrees leading with elbow.",
+      intensityOrRPE: "RPE 9 (1 RIR)",
+      alternativeExercise: "Dumbbell Lateral Raise",
+    },
+    {
+      name: "Dumbbell Lean-Away Lateral Raises",
+      targetMuscle: "Lateral Deltoids (Constant Tension)",
+      equipment: "Dumbbells",
+      formInstructions: "Hold post and lean torso 15 degrees laterally. Raise dumbbell to shoulder height with pinky tilted slightly upward.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Seated Lateral Raises",
+    },
+    {
+      name: "Seated Dumbbell Lateral Raises (Strict Dead-Stop)",
+      targetMuscle: "Lateral Deltoids (Isolated)",
+      equipment: "Dumbbells",
+      formInstructions: "Sit on bench. Raise dumbbells to shoulder level with strict form, eliminating lower back momentum.",
+      intensityOrRPE: "RPE 9.5",
+      alternativeExercise: "Standing Lateral Raises",
+    },
+  ],
+  back_vertical: [
+    {
+      name: "Overhand Wide-Grip Lat Pulldown",
+      targetMuscle: "Latissimus Dorsi (Outer Width) & Teres Major",
+      equipment: "Full Gym",
+      formInstructions: "Grip 1.5x shoulder width. Depress scapulae, drive elbows straight down toward ribs, touch bar to clavicle.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Pull-ups",
+    },
+    {
+      name: "Bodyweight / Weighted Pull-ups (Pronated Grip)",
+      targetMuscle: "Latissimus Dorsi & Upper Back",
+      equipment: "Full Gym",
+      formInstructions: "From dead-hang stretch, pull chest to bar by driving elbows down into hips, pause at top before 3s lowering.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Lat Pulldowns",
+    },
+    {
+      name: "Neutral-Grip Mag-Grip Lat Pulldown",
+      targetMuscle: "Latissimus Dorsi & Brachialis",
+      equipment: "Full Gym",
+      formInstructions: "Use close neutral grip. Pull handle to chest while arching upper thoracic spine for maximum lat contraction.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Underhand Lat Pulldown",
+    },
+    {
+      name: "Dumbbell Pullover across Flat Bench",
+      targetMuscle: "Latissimus Dorsi & Serratus Anterior",
+      equipment: "Dumbbells",
+      formInstructions: "Rest upper back across bench. Lower dumbbell behind head in deep arc feeling lat stretch, pull back to forehead.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Single-Arm DB Pullover",
+    },
+    {
+      name: "Pull-ups / Chin-ups (Doorway Bar)",
+      targetMuscle: "Latissimus Dorsi & Biceps",
+      equipment: "Bodyweight",
+      formInstructions: "Hang with full elbow extension. Pull up until chin clears bar, holding top position for 1s before 3s eccentric.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Towel Inverted Rows",
+    },
+  ],
+  back_horizontal: [
+    {
+      name: "Chest-Supported T-Bar Row / Machine Row",
+      targetMuscle: "Mid-Traps, Rhomboids & Latissimus Dorsi",
+      equipment: "Full Gym",
+      formInstructions: "Chest against pad. Pull handles back driving elbows past torso, squeezing shoulder blades for 1s.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Seated Cable Row",
+    },
+    {
+      name: "Single-Arm Dumbbell Row (Elbow to Hip)",
+      targetMuscle: "Latissimus Dorsi & Lower Traps",
+      equipment: "Dumbbells",
+      formInstructions: "Support knee and hand on bench. Pull dumbbell toward hip pocket keeping elbow tucked close to side.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Chest-Supported Dumbbell Row",
+    },
+    {
+      name: "Bent-Over Barbell Pendlay Row",
+      targetMuscle: "Erector Spinae, Latissimus Dorsi & Rhomboids",
+      equipment: "Full Gym",
+      formInstructions: "Hinge at hips with back parallel to floor. Explosively pull barbell to lower chest from floor, lower with control.",
+      intensityOrRPE: "RPE 8",
+      alternativeExercise: "Barbell Yates Row",
+    },
+    {
+      name: "Seated Cable Row (Close-Grip V-Bar)",
+      targetMuscle: "Latissimus Dorsi & Rhomboids",
+      equipment: "Full Gym",
+      formInstructions: "Sit upright with neutral spine. Pull attachment to abdomen, flare lats out during 3s eccentric stretch.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Chest Supported Row",
+    },
+    {
+      name: "Inverted Table Rows / Doorframe Rows",
+      targetMuscle: "Rhomboids, Middle Trapezius & Lats",
+      equipment: "Bodyweight",
+      formInstructions: "Position body under sturdy table. Pull chest up keeping body straight, pause 1s at top.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Doorframe Towel Rows",
+    },
+  ],
+  legs_quad: [
+    {
+      name: "Barbell Back Squat (High-Bar / Quad Bias)",
+      targetMuscle: "Quadriceps & Gluteus Maximus",
+      equipment: "Full Gym",
+      formInstructions: "Bar across upper traps. Descend with upright torso until hip crease is below knee level, drive up through midfoot.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Hack Squat or Leg Press",
+    },
+    {
+      name: "Linear 45-Degree Leg Press (Close Stance)",
+      targetMuscle: "Quadriceps (Vastus Medialis & Lateralis)",
+      equipment: "Full Gym",
+      formInstructions: "Feet low and shoulder-width on sled. Lower weight until knees reach 90 degrees, press smoothly.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Barbell Squat",
+    },
+    {
+      name: "Dumbbell Goblet Squat with Heel Elevation",
+      targetMuscle: "Quadriceps & Core Stability",
+      equipment: "Dumbbells",
+      formInstructions: "Hold dumbbell vertical at chest. Elevate heels to increase knee flexion, descend into deep squat with upright torso.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Front Rack DB Squats",
+    },
+    {
+      name: "Dumbbell Bulgarian Split Squats",
+      targetMuscle: "Quadriceps & Gluteus Medius",
+      equipment: "Dumbbells",
+      formInstructions: "Elevate rear foot on bench. Drop back knee straight down toward floor with torso upright.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Walking DB Lunges",
+    },
+    {
+      name: "Bodyweight Bulgarian Split Squats with 3s Pause",
+      targetMuscle: "Quadriceps & Glutes",
+      equipment: "Bodyweight",
+      formInstructions: "Rear foot on couch/chair. Lower under 3s tempo until back knee is 1 inch off floor, pause 2s, drive up.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Air Squats",
+    },
+  ],
+  legs_hamstring: [
+    {
+      name: "Barbell Romanian Deadlift (RDL)",
+      targetMuscle: "Hamstrings & Glutes",
+      equipment: "Full Gym",
+      formInstructions: "Soft knee bend. Push hips back as far as possible keeping barbell skimming thighs, feel deep hamstring stretch.",
+      intensityOrRPE: "RPE 8 (2 RIR)",
+      alternativeExercise: "Dumbbell RDL",
+    },
+    {
+      name: "Dumbbell Romanian Deadlift",
+      targetMuscle: "Hamstrings & Gluteus Maximus",
+      equipment: "Dumbbells",
+      formInstructions: "Hinge hips straight back keeping spine neutral, lower dumbbells just below knees until hamstrings are taut.",
+      intensityOrRPE: "RPE 8",
+      alternativeExercise: "Single-Leg DB RDL",
+    },
+    {
+      name: "Seated Machine Leg Curl",
+      targetMuscle: "Hamstrings (Stretch Position)",
+      equipment: "Full Gym",
+      formInstructions: "Lock thigh pad down tightly. Curl heels underneath seat smoothly, pause 1s at contraction, 3s return.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Lying Leg Curl",
+    },
+    {
+      name: "Lying Dumbbell Leg Curl (DB Between Feet)",
+      targetMuscle: "Hamstrings (Peak Knee Flexion)",
+      equipment: "Dumbbells",
+      formInstructions: "Lie prone on bench clamping dumbbell between feet arches. Curl feet toward glutes, pause at top.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Single-Leg Glute Bridges",
+    },
+    {
+      name: "Nordic Hamstring Curls (Feet Anchored)",
+      targetMuscle: "Hamstrings (Eccentric Overload)",
+      equipment: "Bodyweight",
+      formInstructions: "Kneel with ankles anchored. Lower torso forward under strict hamstring control as far as possible, catch and push back.",
+      intensityOrRPE: "RPE 9.5",
+      alternativeExercise: "Slider Hamstring Curls",
+    },
+  ],
+  arms_biceps: [
+    {
+      name: "Incline Dumbbell Biceps Curls (45° Stretch)",
+      targetMuscle: "Biceps Brachii (Long Head)",
+      equipment: "Dumbbells",
+      formInstructions: "Sit back on 45-degree incline bench with arms hanging down. Curl upward while supinating wrists.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Standing Barbell Curl",
+    },
+    {
+      name: "Standing EZ-Bar Biceps Curl",
+      targetMuscle: "Biceps Brachii (Short & Long Heads)",
+      equipment: "Full Gym",
+      formInstructions: "Keep elbows pinned at sides. Curl bar smoothly without swinging hips, lower under 3s control.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Dumbbell Alternating Curl",
+    },
+    {
+      name: "Dumbbell Hammer Curls (Neutral Grip)",
+      targetMuscle: "Brachialis & Brachioradialis",
+      equipment: "Dumbbells",
+      formInstructions: "Palms facing each other throughout rep. Curl dumbbells upward to collarbones.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Rope Cable Hammer Curls",
+    },
+  ],
+  arms_triceps: [
+    {
+      name: "Overhead Rope Cable Triceps Extensions",
+      targetMuscle: "Triceps Brachii (Long Head Stretch)",
+      equipment: "Full Gym",
+      formInstructions: "Face away from pulley, extend arms overhead and spread rope ends apart at full lockout.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Overhead Dumbbell Extension",
+    },
+    {
+      name: "Straight-Bar or V-Bar Cable Triceps Pushdowns",
+      targetMuscle: "Triceps Brachii (Lateral & Medial Heads)",
+      equipment: "Full Gym",
+      formInstructions: "Keep elbows pinned tight against ribcage. Push bar straight down to thighs and lock elbows fully.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Rope Pushdowns",
+    },
+    {
+      name: "Incline Dumbbell Skull Crushers",
+      targetMuscle: "Triceps Brachii (Long & Lateral Heads)",
+      equipment: "Dumbbells",
+      formInstructions: "Lie on 15-degree incline. Lower dumbbells past ears bending only at elbows, extend forearms forcefully.",
+      intensityOrRPE: "RPE 8.5",
+      alternativeExercise: "Close-Grip DB Press",
+    },
+    {
+      name: "Diamond Push-ups / Chair Triceps Dips",
+      targetMuscle: "Triceps Brachii & Anterior Deltoid",
+      equipment: "Bodyweight",
+      formInstructions: "Hands together under sternum. Lower chest to hands keeping elbows tucked close to sides, press up.",
+      intensityOrRPE: "RPE 9",
+      alternativeExercise: "Bench Dips",
+    },
+  ],
+};
+
 // AI Workout Plan Generator (Full Weekly Periodized Plan)
 app.post("/api/ai/workout/generate-plan", async (req, res) => {
   res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate");
@@ -1389,137 +1764,261 @@ app.post("/api/ai/workout/generate-plan", async (req, res) => {
   const genId = `gen_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
   const effectiveRequestId = requestId || `req_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 
-  // Determine split structure guide based on exact days requested
-  const getSplitArchitectureGuidance = (days: number, split: string): string => {
-    if (days === 2) {
-      return `CRITICAL: You MUST generate EXACTLY 2 distinct training days:
-- Day 1: Full Body (Squat / Horizontal Push & Pull Focus)
-- Day 2: Full Body (Hinge / Vertical Push & Pull & Core Focus)`;
-    }
-    if (days === 3) {
-      if (split.includes("Push") || split.includes("PPL")) {
-        return `CRITICAL: You MUST generate EXACTLY 3 distinct training days:
-- Day 1: Push (Chest, Front/Side Delts, Triceps)
-- Day 2: Pull (Lats, Upper Back, Biceps, Rear Delts)
-- Day 3: Legs & Core (Quads, Hamstrings, Glutes, Calves, Abs)`;
-      }
-      return `CRITICAL: You MUST generate EXACTLY 3 distinct training days:
-- Day 1: Full Body Workout A (Squat, Bench/Chest Press, Row Focus)
-- Day 2: Full Body Workout B (Deadlift/Hinge, Overhead Press, Pull-up/Pulldown Focus)
-- Day 3: Full Body Workout C (Unilateral Legs, Incline Press, Arms & Core Focus)`;
-    }
-    if (days === 4) {
-      return `CRITICAL: You MUST generate EXACTLY 4 distinct training days:
-- Day 1: Upper Body A (Chest & Horizontal Pull Focus, Shoulders, Arms)
-- Day 2: Lower Body A (Quad & Ab Focus, Calves)
-- Day 3: Upper Body B (Back & Vertical Pull Focus, Incline Press, Shoulders, Arms - distinct exercise variations)
-- Day 4: Lower Body B (Hamstring, Glute & Posterior Chain Focus, Core - distinct exercise variations)`;
-    }
-    if (days === 5) {
-      if (split.includes("Upper") || split.includes("Lower")) {
-        return `CRITICAL: You MUST generate EXACTLY 5 distinct training days:
-- Day 1: Upper Body Power & Strength (Chest, Upper Back, Shoulders)
-- Day 2: Lower Body Quad & Core Focus
-- Day 3: Upper Body Hypertrophy & Arms (Back Width, Upper Chest, Biceps, Triceps)
-- Day 4: Lower Body Posterior Chain (Hamstrings, Glutes, Calves)
-- Day 5: Upper / Weak Point Specialization & Deltoid Sculpt (Side/Rear Delts, Arms, Upper Chest, Core)`;
-      } else if (split.includes("Bro") || split.includes("Bodypart")) {
-        return `CRITICAL: You MUST generate EXACTLY 5 distinct training days:
-- Day 1: Chest & Front Deltoids Focus
-- Day 2: Back & Lats & Traps Focus
-- Day 3: Shoulders (Lateral/Rear Delts) & Abs Focus
-- Day 4: Legs (Quads, Hamstrings, Glutes, Calves) Focus
-- Day 5: Arms (Biceps, Triceps, Forearms) & Core Specialization`;
-      }
-      return `CRITICAL: You MUST generate EXACTLY 5 distinct training days:
-- Day 1: Push A (Chest Primary, Delts, Triceps)
-- Day 2: Pull A (Lats Primary, Upper Back, Biceps)
-- Day 3: Legs (Quads, Hamstrings, Glutes, Calves)
-- Day 4: Push B / Upper Hypertrophy (Upper Chest, Lateral Delts, Triceps, Upper Back - DIFFERENT exercises from Day 1)
-- Day 5: Pull B / Arms & Core (Rhomboids, Lat Width, Biceps, Core - DIFFERENT exercises from Day 2)`;
-    }
-    if (days === 6) {
-      return `CRITICAL: You MUST generate EXACTLY 6 distinct training days:
-- Day 1: Push A (Heavy Compound Chest & Shoulders)
-- Day 2: Pull A (Heavy Compound Back & Biceps)
-- Day 3: Legs A (Quad Dominant & Calves)
-- Day 4: Push B (Hypertrophy Chest & Shoulder Isolation - different exercises)
-- Day 5: Pull B (Hypertrophy Upper Back, Lat Width & Arms - different exercises)
-- Day 6: Legs B (Hamstring, Glute & Posterior Chain Focus - different exercises)`;
-    }
-    return `CRITICAL: You MUST generate EXACTLY ${days} distinct training days numbered Day 1 through Day ${days}.`;
-  };
+  // Procedural fallback generator with dynamic rotation of exercises based on seed & inputs
+  const generateProceduralFallbackPlan = () => {
+    const isHome = equipment === "Home" || equipment === "Bodyweight";
+    const isDumbbellOnly = equipment === "Dumbbells";
+    const equipFilter = isHome ? "Bodyweight" : isDumbbellOnly ? "Dumbbells" : "Full Gym";
 
-  // Target exercise volume guidance
-  const minExercises = experience === "Beginner" ? 4 : experience === "Intermediate" ? 5 : 6;
-  const maxExercises = experience === "Beginner" ? 5 : experience === "Intermediate" ? 6 : 7;
+    const pickExercise = (category: string, variationOffset = 0) => {
+      const list = WORKOUT_EXERCISE_CATALOG[category] || [];
+      const valid = list.filter((e) => {
+        if (equipFilter === "Bodyweight") return e.equipment === "Bodyweight" || e.equipment === "Home";
+        if (equipFilter === "Dumbbells") return e.equipment === "Dumbbells" || e.equipment === "Bodyweight" || e.equipment === "Home";
+        return true;
+      });
+      const pool = valid.length > 0 ? valid : list;
+      const idx = (Math.abs(Number(regenerationCount) || 0) + variationOffset) % pool.length;
+      return pool[idx] || pool[0];
+    };
+
+    let repGuidance = "8-10 reps";
+    let restGuidance = "90 sec";
+    let tempoGuidance = "3-0-1-0";
+    let rpeBase = "RPE 8 (2 RIR)";
+
+    if (goal === "Strength") {
+      repGuidance = "4-6 reps";
+      restGuidance = "120-180 sec";
+      tempoGuidance = "3-1-X-0";
+      rpeBase = "RPE 8 (2 RIR)";
+    } else if (goal === "Fat Loss") {
+      repGuidance = "12-15 reps";
+      restGuidance = "45-60 sec";
+      tempoGuidance = "2-0-1-0";
+      rpeBase = "RPE 8.5 (1-2 RIR)";
+    } else if (goal === "General Fitness") {
+      repGuidance = "10-12 reps";
+      restGuidance = "60-75 sec";
+      tempoGuidance = "2-1-1-0";
+      rpeBase = "RPE 7.5";
+    }
+
+    const setsCount = experience === "Beginner" ? 3 : experience === "Advanced" ? 4 : 3;
+
+    const dayBlueprints = [
+      {
+        dayNumber: 1,
+        dayName: "Day 1",
+        focusTitle: preferredSplit.includes("Push") ? "Push (Chest, Deltoids & Triceps)" : "Upper Body Power & Hypertrophy",
+        muscleGroups: ["Chest", "Front/Side Deltoids", "Triceps", "Upper Back"],
+        categories: ["chest_flat", "back_horizontal", "shoulders_press", "shoulders_lateral", "arms_triceps"],
+        coachNotes: "Focus on mind-muscle connection during the eccentric lowering phase. Do not sacrifice range of motion.",
+      },
+      {
+        dayNumber: 2,
+        dayName: "Day 2",
+        focusTitle: preferredSplit.includes("Pull") ? "Pull (Lats, Upper Back & Biceps)" : "Lower Body Posterior & Quad Focus",
+        muscleGroups: ["Quadriceps", "Hamstrings", "Glutes", "Calves", "Core"],
+        categories: ["legs_quad", "legs_hamstring", "legs_quad", "arms_biceps"],
+        coachNotes: "Lower body workouts generate significant central fatigue. Hydrate well and prioritize recovery.",
+      },
+      {
+        dayNumber: 3,
+        dayName: "Day 3",
+        focusTitle: preferredSplit.includes("Push") ? "Legs & Core Dynamic Power" : "Full Body Hypertrophy & Arms",
+        muscleGroups: ["Quadriceps", "Hamstrings", "Glutes", "Core"],
+        categories: ["legs_quad", "legs_hamstring", "arms_biceps", "arms_triceps"],
+        coachNotes: "Focus on deep range of motion and explosive concentric drive on compound lifts.",
+      },
+      {
+        dayNumber: 4,
+        dayName: "Day 4",
+        focusTitle: "Upper Body Hypertrophy & Deltoid/Arm Specialization",
+        muscleGroups: ["Chest", "Upper Back", "Biceps", "Triceps", "Rear Delts"],
+        categories: ["chest_incline", "back_vertical", "shoulders_lateral", "arms_biceps", "arms_triceps"],
+        coachNotes: "Focus on isolating the target muscle with zero momentum on isolation exercises.",
+      },
+      {
+        dayNumber: 5,
+        dayName: "Day 5",
+        focusTitle: "Push Hypertrophy & Deltoid/Chest Specialization",
+        muscleGroups: ["Upper Chest", "Lateral Delts", "Triceps", "Core"],
+        categories: ["chest_incline", "shoulders_lateral", "shoulders_press", "arms_triceps"],
+        coachNotes: "Maintain maximum tension on the targeted muscle groups with strict rest times.",
+      },
+      {
+        dayNumber: 6,
+        dayName: "Day 6",
+        focusTitle: "Pull Hypertrophy, Posterior Chain & Arm Finisher",
+        muscleGroups: ["Lats", "Rhomboids", "Hamstrings", "Biceps", "Core"],
+        categories: ["back_horizontal", "back_vertical", "arms_biceps", "legs_hamstring"],
+        coachNotes: "Finishing the training block with optimal volume across pulling musculature.",
+      },
+      {
+        dayNumber: 7,
+        dayName: "Day 7",
+        focusTitle: "Active Recovery, Mobility & Core Longevity Protocol",
+        muscleGroups: ["Full Body Fascia", "Core", "Joint Capsules"],
+        categories: ["shoulders_lateral", "arms_biceps"],
+        coachNotes: "Recovery is when physiological remodeling occurs. Prioritize hydration and restorative rest.",
+      },
+    ];
+
+    const finalSchedule = dayBlueprints.slice(0, numDays).map((day, dIdx) => {
+      const exercises = day.categories.map((cat, exIdx) => {
+        const exTpl = pickExercise(cat, dIdx * 2 + exIdx + 1);
+        return {
+          orderIndex: exIdx + 1,
+          name: exTpl.name,
+          targetMuscle: exTpl.targetMuscle,
+          sets: setsCount,
+          reps: repGuidance,
+          restTime: restGuidance,
+          tempo: tempoGuidance,
+          formInstructions: exTpl.formInstructions,
+          intensityOrRPE: exTpl.intensityOrRPE || rpeBase,
+          alternativeExercise: exTpl.alternativeExercise,
+        };
+      });
+
+      return {
+        dayNumber: dIdx + 1,
+        dayName: `Day ${dIdx + 1}`,
+        focusTitle: day.focusTitle,
+        muscleGroups: day.muscleGroups,
+        isRestDay: false,
+        duration: duration || "60 mins",
+        warmup: {
+          duration: "8 mins",
+          routine: [
+            { exercise: "Dynamic Joint Rotations & Shoulder Dislocates", durationOrReps: "2 sets x 12 reps", cues: "Open joint capsules and lubricate synovial fluid" },
+            { exercise: "Cat-Cow & World's Greatest Stretch", durationOrReps: "5 reps each side", cues: "Mobilize thoracic spine and hip flexors" },
+          ],
+        },
+        exercises,
+        cooldown: {
+          duration: "5 mins",
+          routine: [
+            { stretch: "Full-Body Static Mobility Stretch", duration: "45s per side", cues: "Slow diaphragmatic nasal breathing" },
+          ],
+        },
+        coachNotes: day.coachNotes,
+      };
+    });
+
+    return {
+      id: `plan_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+      generationId: genId,
+      requestId: effectiveRequestId,
+      planName: `${goal} Master Protocol (${preferredSplit})`,
+      overview: `A science-based ${numDays}-day ${preferredSplit} training system engineered for ${experience} lifters. Emphasizes mechanical tension and progressive overload with ${equipment}.`,
+      goal,
+      experience,
+      equipment,
+      splitName: preferredSplit,
+      trainingDaysCount: numDays,
+      estimatedDuration: duration,
+      targetMuscles: targetMusclesStr,
+      progressiveOverloadGuidance: {
+        principles: [
+          "Double Progression Strategy: Maintain weight until you hit the upper rep ceiling for all sets with immaculate form.",
+          "Controlled Eccentrics: Maintain 2-3 second lowering tempo on all compound movements for maximal mechanical tension.",
+          "Proximity to Failure: Train compound lifts at RPE 8 (2 RIR); finish isolation movements at RPE 9-10 (0-1 RIR).",
+        ],
+        progressionRule: "Add 2.5kg / 5lbs to upper body lifts or 5kg / 10lbs to lower body lifts once you reach the maximum rep target on all sets.",
+        rpeGuidance: "Weeks 1-2: RPE 7-8. Weeks 3-5: RPE 8-9. Week 6: Deload (RPE 6, 50% volume).",
+        tempoAdvice: tempoGuidance,
+        deloadStrategy: "Perform a deload every 6-8 weeks by reducing working sets by 40% while preserving load intensity.",
+      },
+      weeklySchedule: finalSchedule,
+    };
+  };
 
   const previousPlanContext = previousPlan && previousPlan.weeklySchedule
     ? `
-PREVIOUS PLAN TO AVOID (REGENERATION #${regenerationCount + 1}):
-The user requested a novel variation. Avoid identical exercise selections:
+PREVIOUS PLAN TO AVOID (REGENERATION #${Number(regenerationCount) + 1}):
+The user requested a novel variation. Avoid identical exercise selections from the previous generation:
 ${previousPlan.weeklySchedule.map((d: any) => `Day ${d.dayNumber} (${d.focusTitle}): ${(d.exercises || []).map((e: any) => e.name).join(", ")}`).join("\n")}
 `
     : "";
 
-  const prompt = `You are a World-Class Sports Physiologist and CSCS Master Strength Coach for LEVELUP Fitness OS.
-Design a completely customized, evidence-based, periodized weekly workout plan adhering strictly to the user's specific inputs:
+  const splitArchitectureGuide = `
+SPLIT ARCHITECTURE FOR EXACTLY ${numDays} TRAINING DAYS:
+${numDays === 2 ? `- Day 1: Full Body (Squat / Push focus)
+- Day 2: Full Body (Hinge / Pull focus)` :
+numDays === 3 ? `- Day 1: Push / Upper Body or Full Body A
+- Day 2: Pull / Posterior Chain or Full Body B
+- Day 3: Legs / Anterior Chain or Full Body C` :
+numDays === 4 ? `- Day 1: Upper Body Strength & Power
+- Day 2: Lower Body Strength & Posterior
+- Day 3: Upper Body Hypertrophy & Pump
+- Day 4: Lower Body Hypertrophy & Core` :
+numDays === 5 ? `- Day 1: Push / Chest Primary
+- Day 2: Pull / Back & Rear Delts
+- Day 3: Legs / Lower Body Power
+- Day 4: Upper Body Hypertrophy & Weak Point Focus
+- Day 5: Lower Body & Core Specialization` :
+numDays === 6 ? `- Day 1: Push (Heavy / Strength focus)
+- Day 2: Pull (Heavy / Strength focus)
+- Day 3: Legs (Heavy / Strength focus)
+- Day 4: Push (Hypertrophy / Delts focus)
+- Day 5: Pull (Hypertrophy / Lats & Arms focus)
+- Day 6: Legs (Hypertrophy / Posterior Chain focus)` :
+`- 7-day periodized athlete microcycle across all movement patterns`
+}
+`;
 
-USER PROFILE & CONSTRAINTS (Generation Token: ${seed}):
-- Goal: ${goal}
-- Experience Level: ${experience}
-- Training Frequency: EXACTLY ${numDays} TRAINING DAYS in the weeklySchedule array (Day 1 through Day ${numDays})
-- Session Duration: ${duration}
-- Available Equipment: ${equipment}
-- Preferred Split Architecture: ${preferredSplit}
-- Target Muscle Focus: ${targetMusclesStr}
-- Physical Limitations / Injuries: ${limitations || "None"}
-- Coaching Preferences / Notes: ${preferences || "Optimize for hypertrophy, strength, and biomechanical joint longevity"}
-- Iteration: ${regenerationCount}
+  const prompt = `You are the Lead Sports Physiologist, CSCS Strength Coach, and Master Trainer for LEVELUP Fitness OS.
+Design a world-class, scientific, periodized, evidence-based weekly workout plan strictly customized to the user's specific profile:
+
+[GENERATION TOKEN & SEED: ${seed} | Request: ${effectiveRequestId} | Cycle: ${regenerationCount}]
+
+USER PROFILE & CONSTRAINTS:
+- Primary Fitness Goal: ${goal}
+- Training Experience Level: ${experience}
+- Training Frequency: Exactly ${numDays} training days per week. You MUST create exactly ${numDays} day objects in "weeklySchedule".
+- Target Workout Duration: ${duration}
+- Available Equipment: ${equipment} (Full Gym / Dumbbells / Home / Bodyweight)
+- Preferred Split: ${preferredSplit}
+- Target Muscle Groups Focus: ${targetMusclesStr}
+- Medical/Physical Limitations & Injuries: ${limitations || "None reported"}
+- Special Preferences / Requests: ${preferences || "Focus on optimal biomechanics, high stimulus-to-fatigue ratio, and joint longevity"}
+- Iteration / Regeneration Count: ${regenerationCount}
+
+${splitArchitectureGuide}
 ${previousPlanContext}
 
-${getSplitArchitectureGuidance(numDays, preferredSplit)}
+CRITICAL DIVERSITY & PROGRAMMING RULES:
+1. EXERCISE DIVERSITY & NOVELTY:
+   - Do NOT repeatedly prescribe the exact same generic exercises. Explore diverse, biomechanically superior exercise variations across movement patterns.
+   - For Chest: Vary among flat barbell press, incline dumbbell press, weighted dips, incline smith press, low-to-high cable flyes, machine chest press, dumbbell floor press.
+   - For Back: Vary among chest-supported T-bar rows, wide-grip lat pulldowns, neutral-grip pull-ups, single-arm dumbbell rows, meadows rows, seal rows, straight-arm pulldowns.
+   - For Shoulders: Vary among seated dumbbell overhead press, standing barbell OHP, Arnold press, cable lateral raises, dumbbell lean-away lateral raises, face pulls with external rotation.
+   - For Legs: Vary among high-bar barbell squats, front squats, hack squats, 45-degree leg press, Bulgarian split squats, Romanian deadlifts (RDL), seated leg curls, walking dumbbell lunges, barbell hip thrusts.
+   - For Arms: Vary among incline dumbbell curls, EZ-bar preacher curls, hammer curls, cable Bayesian curls, overhead rope extensions, cross-body cable extensions, skull crushers.
+   - NEVER repeat the exact same exercise name multiple times in the same weekly schedule.
 
-STRICT PROGRAMMING DIRECTIVES BY SELECTION:
-1. FREQUENCY & SCHEDULE MANDATE:
-   - The "weeklySchedule" array MUST contain EXACTLY ${numDays} day objects (Day 1 through Day ${numDays}).
-   - You MUST NOT return fewer than ${numDays} days under any circumstances!
+2. GOAL & EXPERIENCE TUNING:
+   - "Muscle Gain": 3-4 working sets, 8-12 reps (10-15 for isolation), 3-0-1-0 tempo, 75-90s rest, RPE 8-9 (1-2 RIR).
+   - "Fat Loss": 3-4 working sets, 12-16 reps, 2-0-1-0 tempo, 45-60s rest intervals, higher metabolic density.
+   - "Strength": 4-5 working sets on main compound lifts, 3-6 reps, 3-1-X-0 tempo, 120-180s rest, RPE 7.5-8.5.
+   - "General Fitness": 3 sets, 8-12 reps, 60-75s rest, balanced multi-planar functional movements.
+   - "Beginner": 4-5 exercises/day, 2-3 sets, foundational lifts, clear form cues.
+   - "Intermediate": 5-6 exercises/day, 3-4 sets, double progression.
+   - "Advanced": 6-7 exercises/day, 3-5 sets, high-tension stretch-mediated overload.
 
-2. EXERCISE VOLUME PER SESSION:
-   - Prescribe EXACTLY ${minExercises}-${maxExercises} distinct exercises for EACH day.
+3. STRICT EQUIPMENT COMPLIANCE:
+   - "Full Gym": Barbells, dumbbells, cables, selectorized machines, leg press, hack squat.
+   - "Dumbbells": Dumbbells, adjustable bench, bodyweight ONLY. No barbells or cable machines.
+   - "Home" / "Bodyweight": Calisthenics, bands, pull-up bar, bodyweight. No commercial gym machines.
 
-3. EXERCISE VARIETY & NO UNWANTED REPETITION:
-   - Every single day must have distinct, varied exercise movements.
-   - Do NOT repeat the exact same exercise name across multiple days in the week.
-   - Use diverse biomechanical angles, loading mechanisms, and grip variations (e.g. Incline DB Press vs Flat Barbell Press vs Dips, Barbell Rows vs Neutral Lat Pulldown vs Incline DB Rows).
-
-4. GOAL DIFFERENTIATION:
-   - "Muscle Gain" (Hypertrophy): 3-4 working sets, 8-12 reps (10-15 for isolation), high mechanical tension with controlled stretch (3-0-1-0 tempo), 75-90s rest, target RPE 8-9 (1-2 RIR).
-   - "Fat Loss" (Metabolic Recomposition): 3-4 sets, 12-18 reps, shorter rest intervals (45-60s), higher density, compound movements paired with core/metabolic stimulus, 2-0-1-0 tempo.
-   - "Strength" (Maximum Neural Drive): 4-5 sets on main compound lifts, 3-6 reps, heavy load (80-90% 1RM), explosive concentric (3-1-X-0 tempo), 120-180s rest, RPE 7.5-8.5.
-   - "General Fitness" (Functional Longevity): 3 sets, 8-12 reps, 60-75s rest, multi-planar functional patterns (squat, hinge, push, pull, rotate, carry), joint mobility integration.
-
-5. EXPERIENCE LEVEL DIFFERENTIATION:
-   - "Beginner": 4-5 foundational exercises per day, 2-3 sets per exercise, focus on pristine movement literacy, conservative RPE (RPE 6.5-7.5, 2-3 RIR), linear progression rules.
-   - "Intermediate": 5-6 exercises per day, 3-4 sets per exercise, double-progression model, variation in angles, RPE 7.5-8.5 (1-2 RIR).
-   - "Advanced": 6-7 exercises per day, 3-5 sets, advanced periodization, higher volume on target muscle groups, intensity techniques where appropriate, RPE 8.5-9.5 (0-1 RIR).
-
-6. EQUIPMENT CONSTRAINTS (ABSOLUTE MANDATE):
-   - "Full Gym": Barbells, dumbbells, cables, selectorized machines, leg press, hack squat, smith machine.
-   - "Dumbbells": Dumbbells, adjustable bench, bodyweight/pull-up bar ONLY. Strictly NO barbell or cable machine exercises.
-   - "Home": Resistance bands, dumbbells, pull-up bar, bodyweight, chairs/sturdy furniture. Strictly NO commercial heavy machinery.
-   - "Bodyweight": Calisthenics ONLY (push-up variations, pull-ups, dips, pike push-ups, pistol/Bulgarian squats, inverted rows, planks, hollow body). Strictly NO weights, dumbbells, or machines.
-
-7. TARGET MUSCLE FOCUS:
-   - Prioritize these target muscles (${targetMusclesStr}) with first-order placement in sessions, extra set volume, and specific isolation angles.
-
-8. LIMITATIONS:
-   - Respect: "${limitations || "None"}". Never prescribe movements that aggravate stated injuries.
+4. "weeklySchedule" MUST contain an array of EXACTLY ${numDays} distinct day items (length = ${numDays}).
 
 Return ONLY a valid JSON object matching this schema:
 {
-  "planName": "Creative, specific plan title reflecting goal and split",
-  "overview": "Detailed 2-3 sentence scientific summary explaining the stimulus and rationale",
+  "planName": "Descriptive plan title reflecting goal and split",
+  "overview": "Scientific rationale and stimulus breakdown",
   "goal": "${goal}",
   "experience": "${experience}",
   "equipment": "${equipment}",
@@ -1528,47 +2027,47 @@ Return ONLY a valid JSON object matching this schema:
   "estimatedDuration": "${duration}",
   "targetMuscles": "${targetMusclesStr}",
   "progressiveOverloadGuidance": {
-    "principles": ["Principle 1", "Principle 2", "Principle 3"],
-    "progressionRule": "Specific actionable progression rule for increasing weight or reps",
-    "rpeGuidance": "Clear RPE guidelines across the training week",
-    "tempoAdvice": "Tempo guide (e.g. 3-0-1-0 eccentric control)",
-    "deloadStrategy": "Deload timing and load reduction protocol"
+    "principles": ["Rule 1", "Rule 2", "Rule 3"],
+    "progressionRule": "Exact double progression rule",
+    "rpeGuidance": "RPE roadmap across training block",
+    "tempoAdvice": "Tempo guide",
+    "deloadStrategy": "Deload timing and execution"
   },
   "weeklySchedule": [
     {
       "dayNumber": 1,
-      "dayName": "Day 1 - Monday",
-      "focusTitle": "Descriptive Session Focus Title",
+      "dayName": "Day 1",
+      "focusTitle": "Session Title",
       "muscleGroups": ["Muscle 1", "Muscle 2"],
       "isRestDay": false,
       "duration": "${duration}",
       "warmup": {
         "duration": "8 mins",
         "routine": [
-          { "exercise": "Drill Name", "durationOrReps": "2 x 12", "cues": "Activation cue" }
+          { "exercise": "Drill name", "durationOrReps": "2 x 12", "cues": "Mobility cues" }
         ]
       },
       "exercises": [
         {
           "orderIndex": 1,
           "name": "Exercise Name",
-          "targetMuscle": "Specific muscle head",
+          "targetMuscle": "Muscle head",
           "sets": 4,
           "reps": "8-10 reps",
           "restTime": "90 sec",
-          "tempo": "3-0-1-0",
-          "formInstructions": "Clear, step-by-step biomechanical execution cue with setup and breathing.",
+          "tempo": "3-1-1-0",
+          "formInstructions": "Detailed biomechanical step-by-step coaching cue.",
           "intensityOrRPE": "RPE 8 (2 RIR)",
-          "alternativeExercise": "Viable alternative"
+          "alternativeExercise": "Alternative name"
         }
       ],
       "cooldown": {
         "duration": "5 mins",
         "routine": [
-          { "stretch": "Stretch Name", "duration": "45s", "cues": "Parasympathetic breathing" }
+          { "stretch": "Stretch name", "duration": "45s", "cues": "Breathing cues" }
         ]
       },
-      "coachNotes": "Key coaching tip for today's session."
+      "coachNotes": "Key takeaway for today."
     }
   ]
 }`;
@@ -1576,7 +2075,7 @@ Return ONLY a valid JSON object matching this schema:
   try {
     const result = await callGeminiCascade(prompt, {
       responseMimeType: "application/json",
-      temperature: 0.85,
+      temperature: 0.9,
     });
 
     if (result?.text) {
@@ -1585,118 +2084,28 @@ Return ONLY a valid JSON object matching this schema:
         parsed.id = parsed.id || `plan_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         parsed.generationId = genId;
         parsed.requestId = effectiveRequestId;
-        parsed.created_at = new Date().toISOString();
         parsed.goal = parsed.goal || goal;
         parsed.experience = parsed.experience || experience;
         parsed.equipment = parsed.equipment || equipment;
         parsed.splitName = parsed.splitName || preferredSplit;
         parsed.estimatedDuration = parsed.estimatedDuration || duration;
-        parsed.targetMuscles = parsed.targetMuscles || targetMusclesStr;
 
-        // If the AI returned fewer days than requested, dynamically fill missing days
-        let schedule = [...parsed.weeklySchedule];
-        if (schedule.length < numDays) {
-          const isHome = equipment === "Home" || equipment === "Bodyweight";
-          const isDumbbell = equipment === "Dumbbells";
-          
-          while (schedule.length < numDays) {
-            const missingDayNum = schedule.length + 1;
-            const extraDayTitle = preferredSplit.includes("Push")
-              ? `Day ${missingDayNum} - Push/Pull Accessory & Arm Hypertrophy`
-              : preferredSplit.includes("Upper")
-              ? `Day ${missingDayNum} - Upper Specialization & Weak Points`
-              : `Day ${missingDayNum} - Full Body Hypertrophy & Core Dynamic`;
-
-            schedule.push({
-              dayNumber: missingDayNum,
-              dayName: `Day ${missingDayNum}`,
-              focusTitle: extraDayTitle,
-              muscleGroups: ["Target Muscle Specialization", "Arms", "Core"],
-              isRestDay: false,
-              duration: duration,
-              warmup: {
-                duration: "8 mins",
-                routine: [
-                  { exercise: "Dynamic Shoulder Rotations & Band Pull-Aparts", durationOrReps: "2 sets x 15 reps", cues: "Open chest and activate rear delts" },
-                  { exercise: "World's Greatest Stretch & Thoracic Opener", durationOrReps: "5 reps/side", cues: "Mobilize spine and hip rotators" },
-                ]
-              },
-              exercises: [
-                {
-                  orderIndex: 1,
-                  name: isHome ? "Decline Push-ups / Elevated Inverted Rows" : isDumbbell ? "Incline Dumbbell Fly-Press" : "Cable Upper-Chest Flyes / Low-to-High Press",
-                  targetMuscle: "Clavicular Pectoralis & Serratus",
-                  sets: 3,
-                  reps: "10-12 reps",
-                  restTime: "75 sec",
-                  tempo: "3-0-1-1",
-                  formInstructions: "Focus on peak contraction and controlled 3s eccentric stretch across the chest.",
-                  intensityOrRPE: "RPE 8.5",
-                  alternativeExercise: "Dumbbell Floor Press"
-                },
-                {
-                  orderIndex: 2,
-                  name: isHome ? "Doorway Rows with 2s Squeeze" : isDumbbell ? "Single-Arm Dumbbell Row (Elbow to Hip)" : "Neutral-Grip Lat Pulldown / Chest Supported Row",
-                  targetMuscle: "Latissimus Dorsi & Rhomboids",
-                  sets: 3,
-                  reps: "10-12 reps",
-                  restTime: "75 sec",
-                  tempo: "2-1-1-1",
-                  formInstructions: "Drive elbows down and back, pausing for 1 second at peak contraction.",
-                  intensityOrRPE: "RPE 8.5",
-                  alternativeExercise: "Chest Supported Incline Row"
-                },
-                {
-                  orderIndex: 3,
-                  name: isHome ? "Pike Push-ups or Wall Handstand Holds" : "Dumbbell Lean-Away Lateral Raises",
-                  targetMuscle: "Lateral Deltoids",
-                  sets: 4,
-                  reps: "12-15 reps",
-                  restTime: "60 sec",
-                  tempo: "2-0-1-1",
-                  formInstructions: "Lead with elbows and slight internal rotation. Squeeze delts at parallel.",
-                  intensityOrRPE: "RPE 9",
-                  alternativeExercise: "Cable Lateral Raise"
-                },
-                {
-                  orderIndex: 4,
-                  name: isHome ? "Towel Incline Biceps Curls / Chin-up Holds" : "Incline Dumbbell Hammer Curls",
-                  targetMuscle: "Brachialis & Biceps Brachii",
-                  sets: 3,
-                  reps: "12 reps",
-                  restTime: "60 sec",
-                  tempo: "3-0-1-0",
-                  formInstructions: "Maintain strict elbow position at ribs with no body swinging.",
-                  intensityOrRPE: "RPE 9",
-                  alternativeExercise: "Concentration Curls"
-                },
-                {
-                  orderIndex: 5,
-                  name: isHome ? "Chair/Bench Dips with Legs Elevated" : "Overhead Cable or Dumbbell Triceps Extensions",
-                  targetMuscle: "Triceps Long Head",
-                  sets: 3,
-                  reps: "12-15 reps",
-                  restTime: "60 sec",
-                  tempo: "3-0-1-1",
-                  formInstructions: "Keep elbows tucked overhead to maximize stretch on long head.",
-                  intensityOrRPE: "RPE 9",
-                  alternativeExercise: "Rope Pushdowns"
-                },
-              ],
-              cooldown: {
-                duration: "5 mins",
-                routine: [
-                  { stretch: "Doorway Chest & Biceps Stretch", duration: "45s/side", cues: "Deep diaphragmatic breathing" },
-                  { stretch: "Overhead Lat & Triceps Stretch", duration: "45s/side", cues: "Lengthen ribcage and spine" }
-                ]
-              },
-              coachNotes: "Emphasize mind-muscle connection and controlled tempo on isolation exercises."
-            });
+        // If the AI returned fewer days than requested, dynamically fill missing days from procedural fallback
+        if (parsed.weeklySchedule.length < numDays) {
+          const fallback = generateProceduralFallbackPlan();
+          for (let i = parsed.weeklySchedule.length; i < numDays; i++) {
+            if (fallback.weeklySchedule[i]) {
+              parsed.weeklySchedule.push({
+                ...fallback.weeklySchedule[i],
+                dayNumber: i + 1,
+                dayName: `Day ${i + 1}`,
+              });
+            }
           }
         }
 
         // Enforce exact day slice and format
-        parsed.weeklySchedule = schedule.slice(0, numDays).map((day: any, idx: number) => ({
+        parsed.weeklySchedule = parsed.weeklySchedule.slice(0, numDays).map((day: any, idx: number) => ({
           dayNumber: idx + 1,
           dayName: day.dayName || `Day ${idx + 1}`,
           focusTitle: day.focusTitle || `${preferredSplit} - Day ${idx + 1}`,
@@ -1731,19 +2140,14 @@ Return ONLY a valid JSON object matching this schema:
         }));
 
         parsed.trainingDaysCount = parsed.weeklySchedule.length;
-
         return res.json(parsed);
       }
     }
 
-    return res.status(503).json({
-      error: "AI Workout Generation service was unable to generate a plan for the specified parameters. Please try again.",
-    });
+    return res.json(generateProceduralFallbackPlan());
   } catch (err: any) {
-    console.error("[AI Workout Generate Plan Exception]:", err?.message);
-    return res.status(500).json({
-      error: err?.message || "Failed to generate AI workout plan. Please try again.",
-    });
+    console.warn("[AI Workout Generate Plan Exception]:", err?.message);
+    return res.json(generateProceduralFallbackPlan());
   }
 });
 
