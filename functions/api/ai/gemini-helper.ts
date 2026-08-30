@@ -14,6 +14,52 @@ export interface GeminiCascadeResult {
   modelUsed: string;
 }
 
+// Robust JSON extraction helper that handles markdown code fences, comments, and unescaped newlines
+export function safeExtractJson(text: string): any {
+  if (!text) return null;
+  let clean = text.trim();
+  
+  // Strip markdown code fences if present
+  clean = clean.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+
+  // Try direct parse first
+  try {
+    return JSON.parse(clean);
+  } catch {
+    // If direct parse fails, isolate the outermost balanced JSON object
+    const firstBrace = clean.indexOf('{');
+    const lastBrace = clean.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      const jsonSub = clean.substring(firstBrace, lastBrace + 1);
+      try {
+        return JSON.parse(jsonSub);
+      } catch {
+        // Strip trailing commas before closing braces/brackets
+        const noTrailingCommas = jsonSub.replace(/,\s*([}\]])/g, '$1');
+        try {
+          return JSON.parse(noTrailingCommas);
+        } catch {
+          // Try regex match for json code block if present inside text
+          const codeBlockMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+          if (codeBlockMatch && codeBlockMatch[1]) {
+            try {
+              return JSON.parse(codeBlockMatch[1].trim());
+            } catch {
+              const cleanedBlock = codeBlockMatch[1].trim().replace(/,\s*([}\]])/g, '$1');
+              try {
+                return JSON.parse(cleanedBlock);
+              } catch {
+                // Ignore
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  return null;
+}
+
 export async function callGeminiCascade(
   contents: string,
   options?: GeminiCascadeOptions,

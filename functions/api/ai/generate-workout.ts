@@ -1,10 +1,11 @@
-import { callGeminiCascade } from "./gemini-helper";
+import { callGeminiCascade, safeExtractJson } from "./gemini-helper";
 
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -104,7 +105,7 @@ Return valid JSON with schema:
     }, apiKey);
 
     if (result?.text) {
-      const parsed = JSON.parse(result.text.trim());
+      const parsed = safeExtractJson(result.text);
       if (parsed && parsed.exercises && parsed.exercises.length > 0) {
         return jsonResponse(parsed);
       }

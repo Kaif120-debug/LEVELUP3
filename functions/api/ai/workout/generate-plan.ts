@@ -1,10 +1,11 @@
-import { callGeminiCascade } from "../gemini-helper";
+import { callGeminiCascade, safeExtractJson } from "../gemini-helper";
 
 function jsonResponse(data: any, status = 200) {
   return new Response(JSON.stringify(data), {
     status,
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Requested-With",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -67,7 +68,7 @@ export async function onRequestPost(context: any) {
     ? targetMuscles.join(", ")
     : "Comprehensive Balanced Development";
 
-  // Dynamic Procedural Fallback generator in case of network or rate limits
+  // Dynamic Procedural Fallback generator supporting 2 to 7 full training days
   const generateProceduralFallbackPlan = () => {
     const isHome = equipment === "Home" || equipment === "Bodyweight";
     const isDumbbellOnly = equipment === "Dumbbells";
@@ -75,7 +76,7 @@ export async function onRequestPost(context: any) {
     const dayTemplates = [
       {
         dayNumber: 1,
-        dayName: "Day 1 - Monday",
+        dayName: "Day 1",
         focusTitle: preferredSplit.includes("Push") ? "Push (Chest, Shoulders & Triceps)" : "Upper Body Power & Hypertrophy",
         muscleGroups: ["Chest", "Front/Side Deltoids", "Triceps", "Upper Back"],
         isRestDay: false,
@@ -161,7 +162,7 @@ export async function onRequestPost(context: any) {
       },
       {
         dayNumber: 2,
-        dayName: "Day 2 - Tuesday",
+        dayName: "Day 2",
         focusTitle: preferredSplit.includes("Pull") ? "Pull (Back, Rear Delts & Biceps)" : "Lower Body Posterior & Quad Focus",
         muscleGroups: ["Quadriceps", "Hamstrings", "Glutes", "Calves", "Core"],
         isRestDay: false,
@@ -246,54 +247,92 @@ export async function onRequestPost(context: any) {
       },
       {
         dayNumber: 3,
-        dayName: "Day 3 - Wednesday",
-        focusTitle: "Active Recovery & Mobility Protocol",
-        muscleGroups: ["Full Body Fascia", "Core", "Mobility"],
-        isRestDay: true,
-        duration: "20-30 mins",
+        dayName: "Day 3",
+        focusTitle: preferredSplit.includes("Push") ? "Legs & Core Dynamic Power" : "Active Recovery & Mobility Protocol",
+        muscleGroups: ["Quadriceps", "Hamstrings", "Glutes", "Core"],
+        isRestDay: false,
+        duration: duration || "60 mins",
         warmup: {
-          duration: "5 mins",
+          duration: "8 mins",
           routine: [
-            { exercise: "Diaphragmatic Box Breathing", durationOrReps: "3 minutes (4s in, 4s hold, 4s out, 4s hold)", cues: "Switch nervous system to parasympathetic recovery state" },
+            { exercise: "Dynamic Leg Swings & Hip Airplanes", durationOrReps: "10 reps each leg", cues: "Activate stabilizers and improve dynamic balance" },
+            { exercise: "Bodyweight Cossack Squats", durationOrReps: "2 sets x 8 reps/side", cues: "Mobilize adductors and deep hip capsules" },
           ],
         },
         exercises: [
           {
             orderIndex: 1,
-            name: "Zone 2 Low-Intensity Walk / Light Cycling",
-            targetMuscle: "Cardiovascular System & Recovery",
-            sets: 1,
-            reps: "25-30 mins",
-            restTime: "0 sec",
-            tempo: "Steady pace",
-            formInstructions: "Maintain conversational nasal breathing pace to flush metabolic byproducts without incurring CNS fatigue.",
-            intensityOrRPE: "RPE 4-5",
-            alternativeExercise: "Swimming or Light Elliptical",
+            name: isHome ? "Jump Squats / Pistol Squats" : isDumbbellOnly ? "Dumbbell Front Squat" : "Leg Press / Front Squat",
+            targetMuscle: "Quadriceps & Core",
+            sets: 4,
+            reps: "8-10 reps",
+            restTime: "90-120 sec",
+            tempo: "3-1-1-0",
+            formInstructions: "Keep torso upright and drive through mid-foot with continuous quad tension.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Goblet Squats",
           },
           {
             orderIndex: 2,
-            name: "Full-Body 90/90 Hip Flow & Thoracic Windmills",
-            targetMuscle: "Hip Rotators & Spine",
-            sets: 2,
-            reps: "10 reps each side",
-            restTime: "30 sec",
-            tempo: "Slow & smooth",
-            formInstructions: "Move through active end-ranges of motion to restore joint capsule glide.",
-            intensityOrRPE: "RPE 3",
-            alternativeExercise: "Cat-Cow & Child's Pose Flow",
+            name: isHome ? "Nordic Hamstring Curls / Slider Curls" : "Lying Dumbbell / Machine Leg Curl",
+            targetMuscle: "Hamstrings (Knee Flexion)",
+            sets: 4,
+            reps: "10-12 reps",
+            restTime: "90 sec",
+            tempo: "3-0-1-1",
+            formInstructions: "Control eccentric lowering phase for 3 full seconds. Avoid hip lifting off pad.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Single-leg Deadlift",
+          },
+          {
+            orderIndex: 3,
+            name: "Walking Dumbbell Lunges",
+            targetMuscle: "Gluteus Maximus & Vastus Medialis",
+            sets: 3,
+            reps: "12 steps/leg",
+            restTime: "90 sec",
+            tempo: "2-0-1-0",
+            formInstructions: "Take long stride to bias glute recruitment, keeping front knee tracking over second toe.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Reverse Lunges",
+          },
+          {
+            orderIndex: 4,
+            name: "Seated Calf Raises",
+            targetMuscle: "Soleus",
+            sets: 4,
+            reps: "15 reps",
+            restTime: "60 sec",
+            tempo: "2-2-1-1",
+            formInstructions: "Deep pause at the bottom to eliminate Achilles tendon stretch reflex.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Standing Calf Raise",
+          },
+          {
+            orderIndex: 5,
+            name: "Ab Wheel Rollouts / Plank Walkouts",
+            targetMuscle: "Anterior Core & Rectus Abdominis",
+            sets: 3,
+            reps: "10-12 reps",
+            restTime: "60 sec",
+            tempo: "3-1-1-0",
+            formInstructions: "Maintain posterior pelvic tilt and brace abs hard to prevent lumbar hyperextension.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Dead Bug with Hold",
           },
         ],
         cooldown: {
           duration: "5 mins",
           routine: [
-            { stretch: "Legs-Up-the-Wall Relaxation", duration: "5 mins", cues: "Enhance venous return and reduce lower extremity inflammation" },
+            { stretch: "Standing Quad Stretch", duration: "45s per side", cues: "Tuck tailbone and keep knees together" },
+            { stretch: "Seated Hamstring Stretch", duration: "45s per side", cues: "Reach chest toward toes with flat back" },
           ],
         },
-        coachNotes: "Muscle hypertrophy and strength adaptations happen during rest and deep sleep. Ensure 7-9 hours of quality sleep tonight.",
+        coachNotes: "Focus on deep range of motion and explosive concentric drive on compound leg movements.",
       },
       {
         dayNumber: 4,
-        dayName: "Day 4 - Thursday",
+        dayName: "Day 4",
         focusTitle: "Upper Body Hypertrophy & Deltoid/Arm Specialization",
         muscleGroups: ["Chest", "Upper Back", "Biceps", "Triceps", "Rear Delts"],
         isRestDay: false,
@@ -375,11 +414,227 @@ export async function onRequestPost(context: any) {
         },
         coachNotes: "Focus on isolating the target muscle with zero body english on curls and extensions.",
       },
+      {
+        dayNumber: 5,
+        dayName: "Day 5",
+        focusTitle: "Push Hypertrophy & Deltoid/Chest Specialization",
+        muscleGroups: ["Upper Chest", "Lateral Delts", "Triceps", "Core"],
+        isRestDay: false,
+        duration: duration || "60 mins",
+        warmup: {
+          duration: "8 mins",
+          routine: [
+            { exercise: "Dynamic Chest Fly Stretch & Band Dislocations", durationOrReps: "2 sets x 12 reps", cues: "Open chest and warm up anterior shoulder capsules" },
+            { exercise: "Y-T-W Scapular Raises", durationOrReps: "10 reps each", cues: "Activate mid/lower traps and rotator cuff" },
+          ],
+        },
+        exercises: [
+          {
+            orderIndex: 1,
+            name: isHome ? "Incline Feet-Elevated Push-ups" : isDumbbellOnly ? "Incline Dumbbell Fly-Press" : "Incline Barbell Bench Press",
+            targetMuscle: "Clavicular Pectoralis Major",
+            sets: 4,
+            reps: "8-10 reps",
+            restTime: "90 sec",
+            tempo: "3-1-1-0",
+            formInstructions: "Lower the weight with a controlled 3-second tempo to upper chest, drive up without locking out elbows completely.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Incline Dumbbell Press",
+          },
+          {
+            orderIndex: 2,
+            name: "Dumbbell Arnold Press / Standing Overhead Press",
+            targetMuscle: "Anterior & Lateral Deltoids",
+            sets: 3,
+            reps: "10-12 reps",
+            restTime: "90 sec",
+            tempo: "3-0-1-0",
+            formInstructions: "Rotate palms from facing you at bottom to facing forward at top lockout.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Seated Dumbbell Press",
+          },
+          {
+            orderIndex: 3,
+            name: "Cable / Dumbbell Incline Chest Flyes",
+            targetMuscle: "Inner & Upper Pectoralis",
+            sets: 3,
+            reps: "12-15 reps",
+            restTime: "60 sec",
+            tempo: "2-1-1-1",
+            formInstructions: "Maintain soft bend in elbows. Squeeze chest vigorously at peak contraction.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Floor Flyes",
+          },
+          {
+            orderIndex: 4,
+            name: "Cable Lateral Raises / Heavy Dumbbell Partials",
+            targetMuscle: "Lateral Deltoids",
+            sets: 4,
+            reps: "15 reps",
+            restTime: "60 sec",
+            tempo: "2-0-1-1",
+            formInstructions: "Raise arms out to 90 degrees with pinkies slightly higher than thumbs.",
+            intensityOrRPE: "RPE 9.5",
+            alternativeExercise: "Band Lateral Raise",
+          },
+          {
+            orderIndex: 5,
+            name: "Rope Triceps Pushdowns",
+            targetMuscle: "Triceps Lateral Head",
+            sets: 3,
+            reps: "12-15 reps",
+            restTime: "60 sec",
+            tempo: "2-0-1-1",
+            formInstructions: "Spread the rope wide at the bottom of the movement for maximum peak contraction.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Diamond Push-ups",
+          },
+        ],
+        cooldown: {
+          duration: "5 mins",
+          routine: [
+            { stretch: "Behind-the-Back Chest Opener", duration: "45s hold", cues: "Interlace fingers behind back and lift gently" },
+          ],
+        },
+        coachNotes: "Maintain maximum tension on the targeted muscle groups. Keep rest times strictly on clock.",
+      },
+      {
+        dayNumber: 6,
+        dayName: "Day 6",
+        focusTitle: "Pull Hypertrophy, Posterior Chain & Arm Finisher",
+        muscleGroups: ["Lats", "Rhomboids", "Hamstrings", "Biceps", "Core"],
+        isRestDay: false,
+        duration: duration || "60 mins",
+        warmup: {
+          duration: "8 mins",
+          routine: [
+            { exercise: "Cat-Cow & Thoracic Rotation Flow", durationOrReps: "10 reps each side", cues: "Mobilize spine and posterior chain" },
+            { exercise: "Single-Leg Glute Bridges", durationOrReps: "12 reps/side", cues: "Activate hamstrings and glutes" },
+          ],
+        },
+        exercises: [
+          {
+            orderIndex: 1,
+            name: isHome ? "Pull-ups (Pronated Grip)" : isDumbbellOnly ? "Heavy Single-Arm Dumbbell Row" : "Barbell Deadlift / Heavy Cable Row",
+            targetMuscle: "Erector Spinae, Lats & Upper Back",
+            sets: 4,
+            reps: "6-8 reps",
+            restTime: "120 sec",
+            tempo: "2-1-1-0",
+            formInstructions: "Maintain flat lumbar spine, brace abdominal wall tightly, and drive through heels.",
+            intensityOrRPE: "RPE 8",
+            alternativeExercise: "Rack Pulls or Dumbbell Deadlifts",
+          },
+          {
+            orderIndex: 2,
+            name: "Single-Arm High Cable Pulldown / Dumbbell Pullover",
+            targetMuscle: "Latissimus Dorsi (Lower Lat Sweep)",
+            sets: 3,
+            reps: "10-12 reps",
+            restTime: "90 sec",
+            tempo: "3-0-1-1",
+            formInstructions: "Drive elbow directly into hip pocket for a localized lat pump.",
+            intensityOrRPE: "RPE 8.5",
+            alternativeExercise: "Dumbbell Pullover",
+          },
+          {
+            orderIndex: 3,
+            name: "Dumbbell Hammer Curls",
+            targetMuscle: "Brachialis & Brachioradialis",
+            sets: 3,
+            reps: "10-12 reps",
+            restTime: "60 sec",
+            tempo: "2-0-1-0",
+            formInstructions: "Keep wrists neutral with palms facing each other throughout the rep.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Rope Cable Curls",
+          },
+          {
+            orderIndex: 4,
+            name: "Rear Delt Reverse Flyes (Prone or Cable)",
+            targetMuscle: "Posterior Deltoids",
+            sets: 3,
+            reps: "15 reps",
+            restTime: "60 sec",
+            tempo: "2-0-1-1",
+            formInstructions: "Lead with elbows and avoid shrugging traps.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Face Pulls",
+          },
+          {
+            orderIndex: 5,
+            name: "Hanging Knee / Leg Raises with Russian Twists",
+            targetMuscle: "Obliques & Rectus Abdominis",
+            sets: 3,
+            reps: "15 reps",
+            restTime: "60 sec",
+            tempo: "Controlled",
+            formInstructions: "Rotate torso smoothly under tension without momentum.",
+            intensityOrRPE: "RPE 9",
+            alternativeExercise: "Bicycle Crunches",
+          },
+        ],
+        cooldown: {
+          duration: "5 mins",
+          routine: [
+            { stretch: "Child's Pose Lat Stretch", duration: "60s", cues: "Walk hands to each side to stretch each lat" },
+          ],
+        },
+        coachNotes: "Finishing the training block with optimal volume across upper back and pulling musculature.",
+      },
+      {
+        dayNumber: 7,
+        dayName: "Day 7",
+        focusTitle: "Active Recovery, Mobility & Core Longevity Protocol",
+        muscleGroups: ["Full Body Fascia", "Core", "Joint Capsules"],
+        isRestDay: true,
+        duration: "30 mins",
+        warmup: {
+          duration: "5 mins",
+          routine: [
+            { exercise: "Diaphragmatic Box Breathing", durationOrReps: "3 mins", cues: "Inhale 4s, hold 4s, exhale 4s, hold 4s" },
+          ],
+        },
+        exercises: [
+          {
+            orderIndex: 1,
+            name: "Low-Intensity Zone 2 Aerobic Flush",
+            targetMuscle: "Cardiovascular & Lymphatic Drainage",
+            sets: 1,
+            reps: "25-30 mins",
+            restTime: "0 sec",
+            tempo: "Steady pace",
+            formInstructions: "Maintain nasal breathing only at conversational effort.",
+            intensityOrRPE: "RPE 4-5",
+            alternativeExercise: "Outdoor Walk or Swimming",
+          },
+          {
+            orderIndex: 2,
+            name: "90/90 Hip Flow & Thoracic Spine Mobilization",
+            targetMuscle: "Hip Rotators & Thoracic Spine",
+            sets: 2,
+            reps: "10 reps each",
+            restTime: "30 sec",
+            tempo: "Slow & smooth",
+            formInstructions: "Breathe into tight zones to expand joint capsules.",
+            intensityOrRPE: "RPE 3",
+            alternativeExercise: "Cat-Cow Flow",
+          },
+        ],
+        cooldown: {
+          duration: "5 mins",
+          routine: [
+            { stretch: "Legs Up The Wall Pose", duration: "5 mins", cues: "Promote venous return and deep parasympathetic tone" },
+          ],
+        },
+        coachNotes: "Recovery is when physiological remodeling occurs. Prioritize hydration, nutrition, and restorative rest.",
+      },
     ];
 
     const finalSchedule = dayTemplates.slice(0, numDays);
 
     return {
+      id: `plan_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       planName: `${goal} Master Protocol (${preferredSplit})`,
       overview: `A science-based ${numDays}-day ${preferredSplit} training system engineered for ${experience} lifters. Emphasizes mechanical tension, optimal stimulus-to-fatigue ratios, and progressive overload with ${equipment}.`,
       goal,
@@ -412,13 +667,39 @@ ${previousPlan.weeklySchedule.map((d: any) => `Day ${d.dayNumber} (${d.focusTitl
 `
     : "";
 
+  const splitArchitectureGuide = `
+SPLIT ARCHITECTURE FOR EXACTLY ${numDays} TRAINING DAYS:
+${numDays === 2 ? `- Day 1: Full Body (Squat / Push focus)
+- Day 2: Full Body (Hinge / Pull focus)` :
+numDays === 3 ? `- Day 1: Push / Upper Body or Full Body A
+- Day 2: Pull / Posterior Chain or Full Body B
+- Day 3: Legs / Anterior Chain or Full Body C` :
+numDays === 4 ? `- Day 1: Upper Body Strength & Power
+- Day 2: Lower Body Strength & Posterior
+- Day 3: Upper Body Hypertrophy & Pump
+- Day 4: Lower Body Hypertrophy & Core` :
+numDays === 5 ? `- Day 1: Push / Chest Primary
+- Day 2: Pull / Back & Rear Delts
+- Day 3: Legs / Lower Body Power
+- Day 4: Upper Body Hypertrophy & Weak Point Focus
+- Day 5: Lower Body & Core Specialization` :
+numDays === 6 ? `- Day 1: Push (Heavy / Strength focus)
+- Day 2: Pull (Heavy / Strength focus)
+- Day 3: Legs (Heavy / Strength focus)
+- Day 4: Push (Hypertrophy / Delts focus)
+- Day 5: Pull (Hypertrophy / Lats & Arms focus)
+- Day 6: Legs (Hypertrophy / Posterior Chain focus)` :
+`- 7-day periodized athlete microcycle across all movement patterns`
+}
+`;
+
   const prompt = `You are the Lead Sports Physiologist, CSCS Strength Coach, and Master Trainer for LEVELUP Fitness OS.
 Design a world-class, scientific, periodized, evidence-based weekly workout plan strictly customized to the user's specific profile:
 
 USER PROFILE & CONSTRAINTS:
 - Primary Fitness Goal: ${goal} (e.g., Muscle Gain / Hypertrophy, Fat Loss / Body Recomposition, Max Strength, General Fitness)
 - Training Experience Level: ${experience} (Beginner / Intermediate / Advanced)
-- Training Frequency: Exactly ${numDays} training days per week
+- Training Frequency: Exactly ${numDays} training days per week. You MUST create exactly ${numDays} day objects in "weeklySchedule".
 - Target Workout Duration: ${duration}
 - Available Equipment: ${equipment} (Full Gym / Dumbbells / Home / Bodyweight)
 - Preferred Split: ${preferredSplit}
@@ -427,19 +708,20 @@ USER PROFILE & CONSTRAINTS:
 - Special Preferences / Requests: ${preferences || "Focus on optimal biomechanics and joint longevity"}
 - Iteration / Regeneration Count: ${regenerationCount}
 
+${splitArchitectureGuide}
 ${previousPlanContext}
 
 CRITICAL ARCHITECTURAL REQUIREMENTS:
-1. "weeklySchedule" MUST contain exactly ${numDays} structured day objects (Day 1 to Day ${numDays}).
+1. "weeklySchedule" MUST contain an array of EXACTLY ${numDays} distinct day items (length = ${numDays}). Do NOT return fewer days or more days.
 2. For each day, provide:
-   - "dayNumber": 1, 2, etc.
-   - "dayName": "Day 1 - Monday", etc.
-   - "focusTitle": Specific descriptive training focus (e.g. "Upper Body Strength & Power", "Legs & Posterior Chain Hypertrophy")
+   - "dayNumber": 1, 2, ... up to ${numDays}
+   - "dayName": "Day 1", "Day 2", etc.
+   - "focusTitle": Specific descriptive training focus
    - "muscleGroups": Array of target muscle strings (e.g. ["Chest", "Front Delts", "Triceps"])
-   - "isRestDay": boolean
+   - "isRestDay": boolean (false for scheduled training sessions)
    - "duration": "${duration}"
    - "warmup": { "duration": "8 mins", "routine": [ { "exercise": "name", "durationOrReps": "e.g. 2 x 15", "cues": "concise mobility cue" } ] } (3-4 specific dynamic mobility & activation drills)
-   - "exercises": Array of 4-6 exercises arranged in optimal biomechanical order (compound heavy movements first, isolation and metabolite pump work last).
+   - "exercises": Array of 4-6 exercises arranged in optimal biomechanical order.
      Each exercise MUST have:
      * "orderIndex": 1, 2, 3...
      * "name": Exercise name matching ${equipment}
@@ -448,7 +730,7 @@ CRITICAL ARCHITECTURAL REQUIREMENTS:
      * "reps": String with target rep range (e.g. "6-8 reps", "8-10 reps", "12-15 reps")
      * "restTime": String (e.g. "90-120 sec", "60 sec")
      * "tempo": Tempo notation string (e.g. "3-1-1-0", "2-0-1-1")
-     * "formInstructions": Detailed, concise step-by-step coaching cue explaining proper setup, joint angles, breathing, and common flaws to avoid so user performs it with flawless biomechanics.
+     * "formInstructions": Detailed, concise step-by-step coaching cue explaining proper setup, joint angles, breathing, and common flaws to avoid.
      * "intensityOrRPE": String (e.g. "RPE 8 (2 RIR)", "RPE 9 (1 RIR)")
      * "alternativeExercise": Smart equipment/injury alternative
    - "cooldown": { "duration": "5 mins", "routine": [ { "stretch": "name", "duration": "45s per side", "cues": "recovery cues" } ] }
@@ -477,7 +759,7 @@ Return ONLY a valid JSON object matching this schema:
   "weeklySchedule": [
     {
       "dayNumber": 1,
-      "dayName": "Day 1 - Monday",
+      "dayName": "Day 1",
       "focusTitle": "Session Title",
       "muscleGroups": ["Muscle 1", "Muscle 2"],
       "isRestDay": false,
@@ -521,8 +803,65 @@ Return ONLY a valid JSON object matching this schema:
     }, apiKey);
 
     if (result?.text) {
-      const parsed = JSON.parse(result.text.trim());
-      if (parsed && parsed.weeklySchedule && parsed.weeklySchedule.length > 0) {
+      const parsed = safeExtractJson(result.text);
+      if (parsed && parsed.weeklySchedule && Array.isArray(parsed.weeklySchedule) && parsed.weeklySchedule.length > 0) {
+        parsed.id = parsed.id || `plan_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        parsed.goal = parsed.goal || goal;
+        parsed.experience = parsed.experience || experience;
+        parsed.equipment = parsed.equipment || equipment;
+        parsed.splitName = parsed.splitName || preferredSplit;
+        parsed.estimatedDuration = parsed.estimatedDuration || duration;
+
+        // If Gemini returned fewer days than requested, dynamically append remaining days from procedural fallback
+        if (parsed.weeklySchedule.length < numDays) {
+          const fallback = generateProceduralFallbackPlan();
+          for (let i = parsed.weeklySchedule.length; i < numDays; i++) {
+            if (fallback.weeklySchedule[i]) {
+              parsed.weeklySchedule.push({
+                ...fallback.weeklySchedule[i],
+                dayNumber: i + 1,
+                dayName: `Day ${i + 1}`,
+              });
+            }
+          }
+        }
+
+        // Format and enforce exact day count and indexes
+        parsed.weeklySchedule = parsed.weeklySchedule.slice(0, numDays).map((day: any, idx: number) => ({
+          dayNumber: idx + 1,
+          dayName: day.dayName || `Day ${idx + 1}`,
+          focusTitle: day.focusTitle || `${preferredSplit} - Day ${idx + 1}`,
+          muscleGroups: Array.isArray(day.muscleGroups) ? day.muscleGroups : ["Target Muscles"],
+          isRestDay: Boolean(day.isRestDay),
+          duration: day.duration || duration,
+          warmup: day.warmup || {
+            duration: "8 mins",
+            routine: [
+              { exercise: "Dynamic Joint Preparation", durationOrReps: "2 sets x 10 reps", cues: "Open joint angles" },
+            ],
+          },
+          exercises: (day.exercises || []).map((ex: any, exIdx: number) => ({
+            orderIndex: exIdx + 1,
+            name: ex.name || "Compound Movement",
+            targetMuscle: ex.targetMuscle || "Target Muscle",
+            sets: Number(ex.sets) || 3,
+            reps: String(ex.reps || "8-12 reps"),
+            restTime: String(ex.restTime || "90 sec"),
+            tempo: String(ex.tempo || "3-0-1-0"),
+            formInstructions: String(ex.formInstructions || "Maintain controlled tempo throughout rep."),
+            intensityOrRPE: String(ex.intensityOrRPE || "RPE 8"),
+            alternativeExercise: ex.alternativeExercise || "",
+          })),
+          cooldown: day.cooldown || {
+            duration: "5 mins",
+            routine: [
+              { stretch: "Static Full-Body Stretch", duration: "45s per side", cues: "Deep diaphragmatic breathing" },
+            ],
+          },
+          coachNotes: day.coachNotes || "Focus on progressive overload and pristine form.",
+        }));
+
+        parsed.trainingDaysCount = parsed.weeklySchedule.length;
         return jsonResponse(parsed);
       }
     }
