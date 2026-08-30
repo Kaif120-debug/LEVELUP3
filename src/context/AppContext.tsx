@@ -45,7 +45,7 @@ import { initialAppState, createEmptyAppState } from '../data/initialData';
 import { useAuth } from './AuthContext';
 import * as db from '../services/supabaseService';
 import { supabase } from '../lib/supabase';
-import { startRazorpaySubscription } from '../services/razorpayService';
+import { startRazorpaySubscription, reconcileUserPayment } from '../services/razorpayService';
 
 interface AppContextType {
   state: AppState;
@@ -210,6 +210,7 @@ interface AppContextType {
   closeUpgradeModal: () => void;
   subscribeUser: (options?: string | { plan?: string; name?: string; email?: string; contact?: string; upiId?: string; method?: 'upi' | 'card' | 'netbanking' }) => Promise<{ success: boolean; error?: string }>;
   cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
+  reconcileSubscription: () => Promise<{ success: boolean; reconciled?: boolean; alreadyActive?: boolean; error?: string }>;
 
   // AI Actions
   aiInsights: { insight: string; actionLabel: string; actionLink: string; tip: string };
@@ -686,26 +687,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }));
       }
 
-      // 18. Subscription Hydration
+      // 18. Subscription Hydration & Auto-Recovery
+      let effectiveSubItem = dbSubItem;
+      const isSubActive =
+        effectiveSubItem &&
+        (effectiveSubItem.status === 'active' || effectiveSubItem.status === 'trial') &&
+        (effectiveSubItem.plan === 'pro' || effectiveSubItem.plan_tier === 'pro' || effectiveSubItem.plan === 'LEVELUP_PRO');
+
+      if (!isSubActive) {
+        try {
+          const rec = await reconcileUserPayment({ userId, email: user?.email });
+          if (rec.success && rec.data && (rec.data.status === 'active' || rec.reconciled || rec.alreadyActive)) {
+            effectiveSubItem = rec.data;
+          }
+        } catch (recErr) {
+          console.warn('[Auto-reconcile check notice]:', recErr);
+        }
+      }
+
       if (
-        dbSubItem &&
-        (dbSubItem.status === 'active' || dbSubItem.status === 'trial') &&
-        (dbSubItem.plan === 'pro' || dbSubItem.plan_tier === 'pro' || dbSubItem.plan === 'LEVELUP_PRO')
+        effectiveSubItem &&
+        (effectiveSubItem.status === 'active' || effectiveSubItem.status === 'trial') &&
+        (effectiveSubItem.plan === 'pro' || effectiveSubItem.plan_tier === 'pro' || effectiveSubItem.plan === 'LEVELUP_PRO')
       ) {
-        setDbSubscription(dbSubItem);
+        setDbSubscription(effectiveSubItem);
         setState((prev) => ({
           ...prev,
           subscription: {
-            status: dbSubItem.status as 'active' | 'trial',
+            status: effectiveSubItem!.status as 'active' | 'trial',
             plan: 'LEVELUP_PRO',
             amount: 129,
             currency: 'INR',
-            startDate: dbSubItem.started_at || dbSubItem.created_at || new Date().toISOString().split('T')[0],
-            nextBillingDate: dbSubItem.expires_at || dbSubItem.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
+            startDate: effectiveSubItem!.started_at || effectiveSubItem!.created_at || new Date().toISOString().split('T')[0],
+            nextBillingDate: effectiveSubItem!.expires_at || effectiveSubItem!.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
           },
         }));
-      } else if (dbSubItem) {
-        setDbSubscription(dbSubItem);
+      } else if (effectiveSubItem) {
+        setDbSubscription(effectiveSubItem);
         setState((prev) => ({
           ...prev,
           subscription: {
@@ -2100,7 +2118,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         contact: currentUserContact,
         vpa: customOpts.upiId,
         method: customOpts.method,
-        onSuccess: (subData: DbSubscription) => {
+        onSuccess: async (subData: DbSubscription) => {
           setDbSubscription(subData);
           const today = new Date().toISOString().split('T')[0];
           const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
@@ -2115,6 +2133,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               nextBillingDate: nextMonth,
             },
           }));
+
+          // Direct Client-Side Supabase Write to guarantee persistence under active auth session
+          try {
+            if (currentUserId) {
+              await db.upsertUserSubscription(currentUserId, {
+                plan: 'pro',
+                status: 'active',
+                started_at: subData.started_at || new Date().toISOString(),
+              });
+            }
+          } catch (dbErr) {
+            console.warn('[Direct client subscription write notice]:', dbErr);
+          }
+
           resolve({ success: true });
         },
         onError: (err: string) => {
@@ -2126,6 +2158,75 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         },
       });
     });
+  };
+
+  const reconcileSubscription = async (): Promise<{
+    success: boolean;
+    reconciled?: boolean;
+    alreadyActive?: boolean;
+    error?: string;
+  }> => {
+    let currentUserId = user?.id;
+    let currentUserEmail = user?.email;
+    try {
+      const { data: authData } = await supabase.auth.getUser();
+      if (authData?.user?.id) {
+        currentUserId = authData.user.id;
+        currentUserEmail = authData.user.email || currentUserEmail;
+      }
+    } catch (e) {
+      console.warn('Error resolving user auth during reconcile:', e);
+    }
+
+    if (!currentUserId) {
+      return { success: false, error: 'User must be logged in to restore subscription' };
+    }
+
+    try {
+      const rec = await reconcileUserPayment({ userId: currentUserId, email: currentUserEmail });
+      if (rec.success && rec.data && (rec.data.status === 'active' || rec.reconciled || rec.alreadyActive)) {
+        setDbSubscription(rec.data);
+        const today = rec.data.started_at || new Date().toISOString();
+        const nextMonth = rec.data.expires_at || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+        setState((prev) => ({
+          ...prev,
+          subscription: {
+            status: 'active',
+            plan: 'LEVELUP_PRO',
+            amount: 129,
+            currency: 'INR',
+            startDate: today.split('T')[0],
+            nextBillingDate: nextMonth.split('T')[0],
+          },
+        }));
+
+        // Write directly to Supabase via authenticated client session
+        try {
+          await db.upsertUserSubscription(currentUserId, {
+            plan: 'pro',
+            status: 'active',
+            started_at: rec.data.started_at || new Date().toISOString(),
+          });
+        } catch (dbErr) {
+          console.warn('[Direct client subscription write notice on reconcile]:', dbErr);
+        }
+
+        return {
+          success: true,
+          reconciled: rec.reconciled,
+          alreadyActive: rec.alreadyActive,
+        };
+      }
+
+      return {
+        success: false,
+        error: rec.error || 'No captured payment found on Razorpay for this account',
+      };
+    } catch (err: any) {
+      console.error('reconcileSubscription exception:', err);
+      return { success: false, error: err?.message || 'Failed to reconcile payment' };
+    }
   };
 
   const cancelSubscription = async (): Promise<{ success: boolean; error?: string }> => {
@@ -2549,6 +2650,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         closeUpgradeModal,
         subscribeUser,
         cancelSubscription,
+        reconcileSubscription,
         aiInsights,
         isGeneratingInsights,
         refreshInsights,

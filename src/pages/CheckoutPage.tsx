@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 
 export const CheckoutPage: React.FC = () => {
-  const { state, subscribeUser } = useApp();
+  const { state, subscribeUser, reconcileSubscription } = useApp();
   const navigate = useNavigate();
 
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
@@ -15,9 +15,27 @@ export const CheckoutPage: React.FC = () => {
   const [billingEmail, setBillingEmail] = useState(state.profile.email || 'alexander.chen@example.com');
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [reconcileMessage, setReconcileMessage] = useState<string | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    setErrorMessage(null);
+    setReconcileMessage(null);
+    const res = await reconcileSubscription();
+    setIsReconciling(false);
+    if (res?.success) {
+      setIsSuccess(true);
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 1200);
+    } else {
+      setReconcileMessage(res?.error || 'No active captured payment found on Razorpay for this account.');
+    }
+  };
 
   const rlsFixSql = `ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users manage subscriptions" ON public.subscriptions 
@@ -384,7 +402,7 @@ WITH CHECK (auth.uid() = user_id);`;
                 {/* Submit Action */}
                 <button
                   type="submit"
-                  disabled={isProcessing}
+                  disabled={isProcessing || isReconciling}
                   className="w-full bg-primary-container text-on-primary py-4 px-6 rounded-xl font-label-caps uppercase text-sm font-bold hover:bg-primary transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75"
                 >
                   {isProcessing ? (
@@ -399,6 +417,33 @@ WITH CHECK (auth.uid() = user_id);`;
                     </>
                   )}
                 </button>
+
+                {/* Restore / Reconcile Past Payment */}
+                <div className="pt-2 border-t border-outline-variant/60 text-center space-y-2">
+                  <button
+                    type="button"
+                    onClick={handleReconcile}
+                    disabled={isReconciling || isProcessing}
+                    className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  >
+                    {isReconciling ? (
+                      <>
+                        <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                        <span>Checking Razorpay Records...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[15px]">history_edu</span>
+                        <span>Already paid ₹129? Click here to Restore Pro Access</span>
+                      </>
+                    )}
+                  </button>
+                  {reconcileMessage && (
+                    <p className="text-[11.5px] text-amber-600 dark:text-amber-400 font-medium">
+                      {reconcileMessage}
+                    </p>
+                  )}
+                </div>
 
                 <p className="text-center text-[11px] text-on-surface-variant">
                   🔒 Encrypted with 256-bit SSL • Instant Activation • Cancel Anytime

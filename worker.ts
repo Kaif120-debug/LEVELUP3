@@ -94,6 +94,28 @@ export default {
       );
     }
 
+    // 3b. Razorpay Subscription Reconcile routes
+    if (
+      pathname === "/api/payment/reconcile-payment" ||
+      pathname === "/api/subscription/reconcile" ||
+      pathname === "/api/payment/reconcile"
+    ) {
+      if (method === "POST") {
+        return reconcilePost(context);
+      }
+      return new Response(
+        JSON.stringify({ error: `Method ${method} not allowed on ${pathname}. Expected POST.` }),
+        {
+          status: 405,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": "*",
+            Allow: "POST, OPTIONS",
+          },
+        }
+      );
+    }
+
     // 4. Razorpay Webhook routes
     if (
       pathname === "/api/payment/razorpay-webhook" ||

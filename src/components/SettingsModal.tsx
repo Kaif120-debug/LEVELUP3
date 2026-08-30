@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 
 export const SettingsModal: React.FC = () => {
   const navigate = useNavigate();
-  const { isSettingsOpen, closeSettings, state, updateProfile, cancelSubscription, subscribeUser, isDbLoading } = useApp();
+  const { isSettingsOpen, closeSettings, state, updateProfile, cancelSubscription, subscribeUser, reconcileSubscription, isDbLoading } = useApp();
   const { user, session, signOut, isConfigured } = useAuth();
   const [activeTab, setActiveTab] = useState<'profile' | 'subscription' | 'database'>('profile');
   
@@ -16,9 +16,23 @@ export const SettingsModal: React.FC = () => {
   const [goals, setGoals] = useState(state.profile.goals || 'Gain Lean Muscle & Hypertrophy');
   
   const [isSaving, setIsSaving] = useState(false);
+  const [isReconciling, setIsReconciling] = useState(false);
   const [savedMessage, setSavedMessage] = useState(false);
+  const [reconcileResult, setReconcileResult] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [copiedSql, setCopiedSql] = useState(false);
+
+  const handleReconcile = async () => {
+    setIsReconciling(true);
+    setReconcileResult(null);
+    const res = await reconcileSubscription();
+    setIsReconciling(false);
+    if (res?.success) {
+      setReconcileResult('Membership active! Pro access successfully restored.');
+    } else {
+      setReconcileResult(res?.error || 'No active Razorpay payment record found for this account.');
+    }
+  };
 
   useEffect(() => {
     if (isSettingsOpen) {
@@ -303,6 +317,33 @@ export const SettingsModal: React.FC = () => {
                   </Link>
                 </div>
               )}
+
+              {/* Restore Purchases / Reconcile Payment */}
+              <div className="pt-2 border-t border-outline-variant/60 text-center space-y-2">
+                <button
+                  type="button"
+                  onClick={handleReconcile}
+                  disabled={isReconciling}
+                  className="text-xs text-primary hover:underline font-medium inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isReconciling ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>
+                      <span>Restoring from Razorpay...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-[15px]">history_edu</span>
+                      <span>Already paid? Restore / Reconcile Membership</span>
+                    </>
+                  )}
+                </button>
+                {reconcileResult && (
+                  <p className="text-[11.5px] text-primary font-medium">
+                    {reconcileResult}
+                  </p>
+                )}
+              </div>
 
               <p className="text-center text-[11px] text-on-surface-variant">
                 Need invoice receipt? Contact billing@levelup.app
