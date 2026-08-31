@@ -152,15 +152,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         provider: 'google',
         options: {
           redirectTo,
-          skipBrowserRedirect: true,
         },
       });
-      if (error) return { data, error };
-      if (data?.url) {
-        // Open OAuth in new tab/popup to prevent iframe X-Frame-Options blocking
-        window.open(data.url, '_blank', 'width=550,height=650');
-      }
-      return { data, error: null };
+      return { data, error };
     } catch (err: any) {
       return { data: null, error: err };
     }
