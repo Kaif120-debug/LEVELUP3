@@ -14,6 +14,14 @@ export const LandingPage: React.FC = () => {
     setOpenFaq(openFaq === index ? null : index);
   };
 
+  const scrollToHowItWorks = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const element = document.getElementById('how-it-works');
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   const featuresList = [
     {
       icon: 'fitness_center',
@@ -144,9 +152,9 @@ export const LandingPage: React.FC = () => {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left Column: Hero Copy & CTA */}
             <div className="lg:col-span-6 xl:col-span-7 text-center lg:text-left flex flex-col items-center lg:items-start">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant text-xs font-label-caps uppercase mb-6 animate-fade-up">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-surface-container-high border border-outline-variant text-on-surface-variant text-xs font-label-caps uppercase mb-6 animate-fade-up">
                 <span className="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
-                Unified Life Performance OS • ₹129 / Month
+                UNIFIED LIFE PERFORMANCE OS
               </div>
               
               <h1 className="font-display-xl text-4xl sm:text-5xl md:text-6xl xl:text-7xl mb-6 text-on-surface tracking-tight leading-[1.1] animate-fade-up">
@@ -161,33 +169,42 @@ export const LandingPage: React.FC = () => {
               
               <div className="flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-4 animate-fade-up w-full sm:w-auto">
                 <Link
-                  to="/checkout"
+                  to="/signup"
                   className="w-full sm:w-auto bg-primary-container text-on-primary px-8 py-4 rounded-xl font-label-caps uppercase text-sm font-bold hover:bg-primary transition-all shadow-md hover:shadow-lg inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>START LEVELUP — ₹129/MONTH</span>
+                  <span>EXPLORE LEVELUP</span>
                   <span className="material-symbols-outlined text-lg">arrow_forward</span>
                 </Link>
-                <Link
-                  to="/dashboard"
+                <a
+                  href="#how-it-works"
+                  onClick={scrollToHowItWorks}
                   className="w-full sm:w-auto border border-outline text-on-surface px-8 py-4 rounded-xl font-label-caps uppercase text-sm font-semibold hover:bg-surface-container-high transition-colors inline-flex items-center justify-center cursor-pointer"
                 >
-                  Explore Workspace
-                </Link>
+                  HOW IT WORKS
+                </a>
               </div>
 
               {/* Feature highlights chips */}
-              <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-4 text-xs text-on-surface-variant font-medium">
+              <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-x-5 gap-y-2.5 text-xs text-on-surface-variant font-medium">
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
                   <span>Fitness & Nutrition</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
-                  <span>ATS Resume Builder</span>
+                  <span>Career & AI</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
-                  <span>Creator & Student Hub</span>
+                  <span>Student Hub</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
+                  <span>Finance</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-primary text-[18px]">verified</span>
+                  <span>Productivity & Personal Growth</span>
                 </div>
               </div>
             </div>
