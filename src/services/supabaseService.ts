@@ -1946,7 +1946,13 @@ export async function fetchJobApplications(userId: string): Promise<DbJobApplica
       console.warn('fetchJobApplications error:', error.message);
       return [];
     }
-    return data || [];
+    return (data || []).map((row: any) => ({
+      ...row,
+      company: row.company_name || row.company || '',
+      role: row.job_title || row.role || row.position || '',
+      location: row.location || 'Remote',
+      status: row.status || 'Applied',
+    }));
   } catch (err) {
     console.error('fetchJobApplications exception:', err);
     return [];

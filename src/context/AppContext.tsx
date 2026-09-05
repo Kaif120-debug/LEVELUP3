@@ -581,16 +581,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...prev,
           career: {
             ...prev.career,
-            jobs: dbJobsList.map((j) => ({
-              id: j.id,
-              company: j.company,
-              role: j.role,
-              location: j.location || 'Remote',
-              salary: j.salary || '',
-              stage: (j.status === 'Interview' ? 'Interview' : j.status === 'Offer' ? 'Offer' : j.status === 'Shortlisted' ? 'Shortlisted' : j.status === 'Saved' ? 'Saved' : 'Applied') as 'Saved' | 'Applied' | 'Shortlisted' | 'Interview' | 'Offer',
-              date: j.applied_date ? new Date(j.applied_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Recently',
-              notes: j.notes || undefined,
-            })),
+            jobs: dbJobsList.map((j) => {
+              const statusRaw = (j.status || 'Applied').toLowerCase();
+              let normalizedStage: any = 'Applied';
+              if (statusRaw === 'saved') normalizedStage = 'Saved';
+              else if (statusRaw === 'applied') normalizedStage = 'Applied';
+              else if (statusRaw === 'screening' || statusRaw === 'shortlisted') normalizedStage = 'Screening';
+              else if (statusRaw === 'interview' || statusRaw === 'interviewing') normalizedStage = 'Interview';
+              else if (statusRaw === 'offer' || statusRaw === 'offered') normalizedStage = 'Offer';
+              else if (statusRaw === 'rejected' || statusRaw === 'declined') normalizedStage = 'Rejected';
+
+              const rawDate = j.application_date || j.applied_date || j.date_applied;
+              return {
+                id: j.id,
+                company: j.company_name || j.company || 'Unknown Company',
+                company_name: j.company_name || j.company,
+                role: j.job_title || j.role || j.position || 'Role',
+                job_title: j.job_title || j.role || j.position,
+                location: j.location || 'Remote',
+                salary: j.salary || '',
+                job_url: j.job_url || '',
+                employment_type: (j.employment_type as any) || 'Full-time',
+                work_mode: (j.work_mode as any) || 'Remote',
+                application_date: rawDate || '',
+                stage: normalizedStage,
+                status: normalizedStage,
+                source: (j.source as any) || 'LinkedIn',
+                priority: (j.priority as any) || 'Medium',
+                date: rawDate ? new Date(rawDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Recently',
+                notes: j.notes || undefined,
+              };
+            }),
           },
         }));
       }
@@ -1444,12 +1465,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     if (user?.id) {
       const res = await db.createJobApplication(user.id, {
-        company: job.company,
-        role: job.role,
+        company: job.company_name || job.company,
+        role: job.job_title || job.role,
         location: job.location,
         salary: job.salary,
-        status: job.stage,
+        status: job.status || job.stage,
         notes: job.notes,
+        job_url: job.job_url,
+        applied_date: job.application_date,
       });
       if (res.data) {
         setState((prev) => ({

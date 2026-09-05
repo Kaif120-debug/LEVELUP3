@@ -307,17 +307,55 @@ export interface DbStudentAssignment {
 export interface DbJobApplication {
   id: string;
   user_id: string;
-  company: string;
-  role: string;
+  company?: string;
+  company_name?: string;
+  role?: string;
+  job_title?: string;
+  position?: string;
   location?: string | null;
   salary?: string | null;
-  status?: string | null;
-  notes?: string | null;
+  employment_type?: string | null;
+  work_mode?: string | null;
+  application_date?: string | null;
+  date_applied?: string | null;
   applied_date?: string | null;
   job_url?: string | null;
+  source?: string | null;
+  status?: string | null;
+  priority?: string | null;
+  notes?: string | null;
   interview_date?: string | null;
+  ai_match_score?: number | null;
+  ai_summary?: string | null;
+  ai_analysis?: any | null;
+  ai_analyzed_at?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export interface DbInterview {
+  id: string;
+  job_application_id: string;
+  user_id: string;
+  interview_date: string;
+  interview_time?: string | null;
+  round?: string | null;
+  interview_type?: string | null;
+  interviewer?: string | null;
+  notes?: string | null;
+  result?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DbFollowUp {
+  id: string;
+  job_application_id: string;
+  user_id: string;
+  follow_up_date: string;
+  note: string;
+  completed: boolean;
+  created_at?: string;
 }
 
 export interface DbFinanceTransaction {
@@ -487,15 +525,106 @@ export interface ResumeData {
   template: 'minimal' | 'professional' | 'tech' | 'modern';
 }
 
+export type JobApplicationStatus = 'Saved' | 'Applied' | 'Screening' | 'Interview' | 'Offer' | 'Rejected' | 'Shortlisted';
+export type JobEmploymentType = 'Full-time' | 'Part-time' | 'Internship' | 'Contract';
+export type JobWorkMode = 'Remote' | 'Hybrid' | 'On-site';
+export type JobPriority = 'High' | 'Medium' | 'Low';
+export type JobSource = 'LinkedIn' | 'Indeed' | 'Company Website' | 'Referral' | 'Other';
+
+export interface JobInterview {
+  id: string;
+  job_application_id: string;
+  user_id?: string;
+  interview_date: string;
+  interview_time?: string;
+  round?: string;
+  interview_type?: string;
+  interviewer?: string;
+  notes?: string;
+  result?: 'Scheduled' | 'Passed' | 'Failed' | 'Pending Feedback' | 'Cancelled';
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface JobFollowUp {
+  id: string;
+  job_application_id: string;
+  user_id?: string;
+  follow_up_date: string;
+  note: string;
+  completed: boolean;
+  created_at?: string;
+}
+
 export interface JobApplication {
   id: string;
+  user_id?: string;
   company: string;
+  company_name?: string;
   role: string;
+  job_title?: string;
   location: string;
+  job_url?: string;
   salary?: string;
+  employment_type?: JobEmploymentType;
+  work_mode?: JobWorkMode;
+  application_date?: string;
   date: string;
-  stage: 'Saved' | 'Applied' | 'Shortlisted' | 'Interview' | 'Offer';
+  stage: JobApplicationStatus;
+  status?: JobApplicationStatus;
+  source?: JobSource;
+  priority?: JobPriority;
   notes?: string;
+  created_at?: string;
+  updated_at?: string;
+  interviews?: JobInterview[];
+  follow_ups?: JobFollowUp[];
+  ai_match_score?: number;
+  ai_summary?: string;
+  ai_analysis?: JobAIAnalysis;
+  ai_analyzed_at?: string;
+}
+
+export interface JobAIAnalysis {
+  match_score: number;
+  fit_verdict: 'High Match' | 'Moderate Match' | 'Reach Role';
+  score_breakdown?: {
+    skills_match: number;
+    experience_match: number;
+    domain_match: number;
+  };
+  job_summary: string;
+  matched_skills: string[];
+  missing_skills: string[];
+  candidate_strengths: string[];
+  skill_gaps: string[];
+  application_recommendations: string[];
+  analyzed_at: string;
+  source_url?: string;
+  extracted_details?: {
+    company_name?: string;
+    job_title?: string;
+    location?: string;
+    salary?: string;
+    employment_type?: JobEmploymentType;
+    work_mode?: JobWorkMode;
+  };
+}
+
+export interface JobStats {
+  total: number;
+  saved: number;
+  applied: number;
+  screening: number;
+  interview: number;
+  offer: number;
+  rejected: number;
+  responseRate: number;
+  interviewConversionRate: number;
+  offerRate: number;
+  appsThisWeek: number;
+  appsThisMonth: number;
+  topCompanies: { name: string; count: number }[];
 }
 
 // Interview Prep Types
