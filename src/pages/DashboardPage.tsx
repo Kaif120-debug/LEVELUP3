@@ -1,13 +1,22 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { SideNavBar } from '../components/SideNavBar';
 import { useApp } from '../context/AppContext';
+import { trackEvent } from '../utils/analytics';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { state, openAIModal, aiInsights, isGeneratingInsights, refreshInsights, updateProtein } = useApp();
   const [showDietModal, setShowDietModal] = useState(false);
   const [mealProtein, setMealProtein] = useState('35');
+
+  useEffect(() => {
+    const hasVisited = localStorage.getItem('levelup_dashboard_visited');
+    if (!hasVisited) {
+      trackEvent('first_dashboard_visit');
+      localStorage.setItem('levelup_dashboard_visited', 'true');
+    }
+  }, []);
 
   const handleAddMeal = (e: React.FormEvent) => {
     e.preventDefault();

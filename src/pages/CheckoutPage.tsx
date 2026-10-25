@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { trackEvent } from '../utils/analytics';
 
 export const CheckoutPage: React.FC = () => {
   const { state, subscribeUser, reconcileSubscription } = useApp();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    trackEvent('checkout_initiated');
+  }, []);
 
   const [paymentMethod, setPaymentMethod] = useState<'upi' | 'card' | 'netbanking'>('upi');
   const [upiId, setUpiId] = useState('');

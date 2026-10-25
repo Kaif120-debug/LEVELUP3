@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { trackEvent } from '../utils/analytics';
 
 export const OnboardingPage: React.FC = () => {
   const navigate = useNavigate();
@@ -9,6 +10,10 @@ export const OnboardingPage: React.FC = () => {
   const [selected, setSelected] = useState<string[]>(state.profile.selectedFocus || ['fitness', 'career', 'productivity']);
   const [primaryGoal, setPrimaryGoal] = useState('Senior Product Designer');
   const [fitnessGoal, setFitnessGoal] = useState('Gain Muscle & Hypertrophy');
+
+  useEffect(() => {
+    trackEvent('email_verification_completed');
+  }, []);
 
   const toggle = (id: string) => {
     setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
