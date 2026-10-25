@@ -57,15 +57,19 @@
   --color-outline: #727972;
   --color-outline-variant: #c2c8c0;
 
-  --color-background: #faf9f6;
-  --color-on-background: #1a1c1a;
+  --color-background: #F8F7F2;
+  --color-on-background: #1C211D;
+  --color-card: #FFFFFF;
+  --color-card-foreground: #1C211D;
+  --color-border: #E8E9E2;
 
-  --color-destructive: #ba1a1a;
-  --color-destructive-foreground: #ffffff;
-  --color-error: #ba1a1a;
-  --color-error-container: #ffdad6;
-  --color-on-error: #ffffff;
-  --color-on-error-container: #93000a;
+  --color-primary: #234B36;
+  --color-primary-foreground: #FFFFFF;
+  --color-bright-green: #55B978;
+  --color-light-green: #DDF3E4;
+  --color-orange: #F28A4B;
+  --color-light-orange: #FFE1CC;
+  --color-secondary-text: #6D756E;
 
   --spacing-gutter: 24px;
   --spacing-margin-desktop: 40px;
@@ -81,8 +85,8 @@
 
 body {
   font-family: var(--font-hanken);
-  background-color: var(--color-background);
-  color: var(--color-on-background);
+  background-color: #F8F7F2;
+  color: #1C211D;
 }
 
 .material-symbols-outlined {
@@ -114,13 +118,13 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #dadad7;
+  background: #E8E9E2;
   border-radius: 4px;
 }
 
 .selection-card.selected {
-  border-color: #26422e;
-  background-color: #f4f4f0;
+  border-color: #234B36;
+  background-color: #DDF3E4;
 }
 .selection-card.selected .check-icon {
   opacity: 1;
@@ -129,7 +133,7 @@ body {
 @keyframes fadeUp {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -138,7 +142,78 @@ body {
 }
 
 .animate-fade-up {
-  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeUp 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes floatSlow {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+@keyframes floatReverse {
+  0%, 100% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(8px);
+  }
+}
+
+@keyframes floatGentle {
+  0%, 100% {
+    transform: translate(0px, 0px);
+  }
+  50% {
+    transform: translate(-3px, -6px);
+  }
+}
+
+@keyframes marqueeLeft {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes marqueeRight {
+  0% {
+    transform: translateX(-50%);
+  }
+  100% {
+    transform: translateX(0%);
+  }
+}
+
+.animate-marquee-left {
+  display: flex;
+  width: max-content;
+  animation: marqueeLeft 46s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-right {
+  display: flex;
+  width: max-content;
+  animation: marqueeRight 46s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee-left:hover,
+.animate-marquee-right:hover {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee-left,
+  .animate-marquee-right {
+    animation: none;
+  }
 }
 
 /* Typography Utility Shortcuts */
