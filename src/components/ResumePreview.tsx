@@ -25,7 +25,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ resume, previewRef
       <div
         ref={previewRef}
         id="resume-paper"
-        className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#1A1C1A] p-12 sm:p-14 shadow-lg border border-outline-variant/40 rounded-sm font-sans flex flex-col justify-between"
+        className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#1A1C1A] p-5 sm:p-10 md:p-14 shadow-lg border border-outline-variant/40 rounded-sm font-sans flex flex-col justify-between"
       >
         <div className="space-y-6">
           {/* Header */}
@@ -215,7 +215,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ resume, previewRef
       <div
         ref={previewRef}
         id="resume-paper"
-        className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#111827] p-12 sm:p-14 shadow-lg border-t-8 border-t-[#1E3A8A] border border-outline-variant/40 rounded-sm font-serif"
+        className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#111827] p-5 sm:p-10 md:p-14 shadow-lg border-t-8 border-t-[#1E3A8A] border border-outline-variant/40 rounded-sm font-serif"
       >
         <div className="space-y-6">
           <header className="border-b-2 border-[#1E3A8A]/20 pb-4">
@@ -338,7 +338,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ resume, previewRef
       <div
         ref={previewRef}
         id="resume-paper"
-        className="w-full max-w-[800px] min-h-[1050px] bg-[#0F172A] text-[#F8FAFC] p-10 sm:p-12 shadow-2xl border border-slate-700 rounded-lg font-mono text-xs"
+        className="w-full max-w-[800px] min-h-[1050px] bg-[#0F172A] text-[#F8FAFC] p-4 sm:p-8 md:p-12 shadow-2xl border border-slate-700 rounded-lg font-mono text-xs"
       >
         <div className="space-y-6">
           {/* Terminal-style header */}
@@ -450,7 +450,7 @@ export const ResumePreview: React.FC<ResumePreviewProps> = ({ resume, previewRef
     <div
       ref={previewRef}
       id="resume-paper"
-      className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#1A1C1A] p-10 sm:p-12 shadow-xl border border-outline-variant/40 rounded-sm font-sans flex flex-col justify-between"
+      className="w-full max-w-[800px] min-h-[1050px] bg-white text-[#1A1C1A] p-5 sm:p-8 md:p-12 shadow-xl border border-outline-variant/40 rounded-sm font-sans flex flex-col justify-between"
     >
       <div className="space-y-6">
         {/* Modern Header with Badge */}

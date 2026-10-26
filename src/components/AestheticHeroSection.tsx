@@ -301,32 +301,32 @@ export const AestheticHeroSection: React.FC<AestheticHeroSectionProps> = ({ onSc
                 </span>
               </span>
 
-              {/* Line 4: Your Life. (In phone preview: sits directly below 'to Level Up'!) */}
-              <span className="block lg:hidden text-[clamp(2.75rem,7vw,6.4rem)] font-extrabold text-[#1C211D] tracking-tighter leading-[0.92] mt-0.5 sm:mt-1 drop-shadow-2xs">
+              {/* Line 4: Your Life. (On mobile phone preview only: sits directly below 'to Level Up') */}
+              <span className="block sm:hidden text-[clamp(2.5rem,7vw,6.4rem)] font-extrabold text-[#1C211D] tracking-tighter leading-[0.92] mt-0.5 drop-shadow-2xs">
                 Your Life.
               </span>
             </h1>
           </div>
 
           {/* BOTTOM SPLIT: Lower-Left CTA & Lower-Right Grounding Shelf */}
-          <div className="relative z-10 mt-10 sm:mt-14 lg:mt-16 pt-4 flex flex-col lg:flex-row items-start lg:items-end justify-between gap-8 sm:gap-10">
+          <div className="relative z-10 mt-8 sm:mt-12 lg:mt-16 pt-4 flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6 sm:gap-10">
             
-            {/* LOWER-LEFT NEGATIVE SPACE: Product Promise & CTAs */}
-            <div className="w-full lg:max-w-md xl:max-w-lg space-y-5 sm:space-y-6">
+            {/* LOWER-LEFT NEGATIVE SPACE: Product Promise & Compact CTAs */}
+            <div className="w-full sm:max-w-md xl:max-w-lg space-y-4 sm:space-y-6">
               {/* Supporting Subheadline: In phone preview, this line is a little bold as requested */}
-              <p className="text-base sm:text-lg text-[#1C211D] sm:text-[#4E564F] leading-relaxed font-semibold sm:font-normal max-w-md">
+              <p className="text-sm sm:text-base lg:text-lg text-[#1C211D] sm:text-[#4E564F] leading-relaxed font-semibold sm:font-normal max-w-md">
                 Manage your fitness, career, nutrition, and personal growth from one clean workspace. Spend less time switching between apps and more time building momentum.
               </p>
 
-              {/* Call-to-Action Buttons */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+              {/* Call-to-Action Buttons: Shortened & Compact in Phone Preview */}
+              <div className="flex flex-row flex-wrap items-center gap-2.5 sm:gap-4">
                 <Link
                   to="/signup"
                   onClick={() => trackEvent('signup_button_clicked', { source: 'hero_primary_editorial' })}
-                  className="px-7 py-3.5 sm:py-4 rounded-xl text-sm font-semibold text-white bg-[#234B36] hover:bg-[#1a3828] transition-all shadow-sm hover:shadow flex items-center justify-center gap-2 cursor-pointer group"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-4 sm:px-7 py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-semibold text-white bg-[#234B36] hover:bg-[#1a3828] transition-all shadow-sm hover:shadow cursor-pointer group shrink-0"
                 >
                   <span>Get Started Free</span>
-                  <span className="material-symbols-outlined text-base group-hover:translate-x-0.5 transition-transform">
+                  <span className="material-symbols-outlined text-sm sm:text-base group-hover:translate-x-0.5 transition-transform">
                     arrow_forward
                   </span>
                 </Link>
@@ -334,18 +334,18 @@ export const AestheticHeroSection: React.FC<AestheticHeroSectionProps> = ({ onSc
                 <a
                   href="#features"
                   onClick={onScrollToFeatures}
-                  className="px-6 py-3.5 sm:py-4 rounded-xl text-sm font-medium text-[#234B36] bg-[#FFFFFF] hover:bg-[#F4F3EE] border border-[#E8E9E2] transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
+                  className="inline-flex items-center justify-center gap-1.5 sm:gap-2 px-3.5 sm:px-6 py-2 sm:py-3.5 rounded-lg sm:rounded-xl text-xs sm:text-sm font-medium text-[#234B36] bg-[#FFFFFF] hover:bg-[#F4F3EE] border border-[#E8E9E2] transition-colors cursor-pointer shadow-2xs shrink-0"
                 >
                   <span>Explore Platform</span>
-                  <span className="material-symbols-outlined text-base text-[#6D756E]">
+                  <span className="material-symbols-outlined text-sm sm:text-base text-[#6D756E]">
                     expand_more
                   </span>
                 </a>
               </div>
             </div>
 
-            {/* LOWER-RIGHT NOTCH ANCHOR: "Your Life." on Desktop */}
-            <div className="hidden lg:block select-none pt-4 lg:pt-0">
+            {/* LOWER-RIGHT NOTCH ANCHOR: "Your Life." on Laptop / Desktop (Exactly where it was) */}
+            <div className="hidden sm:block select-none pt-4 sm:pt-0">
               <div
                 className={`text-[clamp(3.5rem,7.8vw,7.2rem)] font-extrabold tracking-tighter leading-[0.88] ${shelfTextColor}`}
               >
