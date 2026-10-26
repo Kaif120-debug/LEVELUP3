@@ -238,44 +238,6 @@ export const AestheticHeroSection: React.FC<AestheticHeroSectionProps> = ({ onSc
                    Z"
                 fill={arrowFill}
               />
-
-              {/* 45° Accent Guideline */}
-              <line
-                x1="160"
-                y1="220"
-                x2="380"
-                y2="0"
-                stroke="#FFFFFF"
-                strokeOpacity="0.28"
-                strokeWidth="2"
-                strokeDasharray="6 6"
-              />
-
-              {/* Swiss Typography Coordinate Detail */}
-              <text
-                x="24"
-                y="735"
-                fill="#FFFFFF"
-                fillOpacity="0.45"
-                fontSize="12"
-                fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-                letterSpacing="0.18em"
-              >
-                LEVELUP // ASCENT VECTOR · 45°
-              </text>
-
-              {/* System Stamp */}
-              <text
-                x="24"
-                y="155"
-                fill="#FFFFFF"
-                fillOpacity="0.45"
-                fontSize="11"
-                fontFamily="ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace"
-                letterSpacing="0.14em"
-              >
-                ▲ SYS.01
-              </text>
             </svg>
           </div>
 
