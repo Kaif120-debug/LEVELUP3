@@ -10,6 +10,7 @@ import { AppProvider } from './context/AppContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
+import { AuthCallbackPage } from './pages/AuthCallbackPage';
 import { CheckoutPage } from './pages/CheckoutPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { UpdatePasswordPage } from './pages/UpdatePasswordPage';
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<LoginPage initialMode="signup" />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/update-password" element={<UpdatePasswordPage />} />
             <Route path="/reset-password" element={<UpdatePasswordPage />} />

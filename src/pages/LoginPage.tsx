@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { trackEvent } from '../utils/analytics';
+import { isInAppBrowser, getInAppBrowserName, isAndroid, getChromeIntentUrl } from '../utils/browser';
 
 interface LoginPageProps {
   initialMode?: 'login' | 'signup' | 'forgot';
@@ -12,7 +13,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { updateProfile } = useApp();
-  const { signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
+  const { user, isAuthLoading, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'signup' | 'forgot'>(() => {
     if (initialMode) return initialMode;
@@ -28,6 +29,48 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode }) => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [verificationPendingEmail, setVerificationPendingEmail] = useState<string | null>(null);
+
+  const inAppBrowser = isInAppBrowser();
+  const inAppBrowserName = getInAppBrowserName();
+
+  // 1. Forward OAuth callbacks (?code=...) that land on /login directly to /auth/callback
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    if (searchParams.has('code')) {
+      navigate(`/auth/callback${location.search}${location.hash}`, { replace: true });
+    }
+  }, [location.search, location.hash, navigate]);
+
+  // 2. Auto-redirect if already authenticated and session is ready
+  useEffect(() => {
+    if (user && !isAuthLoading && !verificationPendingEmail) {
+      const from = (location.state as any)?.from?.pathname || '/dashboard';
+      navigate(from, { replace: true });
+    }
+  }, [user, isAuthLoading, verificationPendingEmail, navigate, location.state]);
+
+  // 3. Capture errors from URL query parameters or navigation state
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const errParam = searchParams.get('error_description') || searchParams.get('error') || (location.state as any)?.error;
+    if (errParam) {
+      const lower = errParam.toLowerCase();
+      if (lower.includes('denied') || lower.includes('cancel')) {
+        setErrorMsg('Google sign-in was cancelled. Please try again.');
+      } else if (lower.includes('disallowed') || lower.includes('useragent') || lower.includes('webview')) {
+        setErrorMsg(
+          `Google sign-in is restricted inside ${inAppBrowserName || 'this in-app browser'}. Please tap the menu (•••) and select "Open in Chrome" or "Open in Safari", or sign in with your email and password.`
+        );
+      } else {
+        setErrorMsg(errParam);
+      }
+    }
+
+    const msgParam = searchParams.get('message') || (location.state as any)?.message;
+    if (msgParam) {
+      setSuccessMsg(msgParam);
+    }
+  }, [location.search, location.state, inAppBrowserName]);
 
   // Sync mode if route changes
   useEffect(() => {
@@ -289,6 +332,39 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialMode }) => {
                     : 'Enter your credentials to access your dashboard.'}
                 </p>
               </div>
+
+              {/* In-App Browser Guidance Banner (Instagram, Facebook, etc.) */}
+              {inAppBrowser && (
+                <div className="mb-4 p-3 bg-amber-50/90 border border-amber-200/80 rounded-xl text-left text-xs text-amber-900 space-y-1.5">
+                  <div className="flex items-start gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-amber-700 shrink-0 mt-0.5">
+                      open_in_browser
+                    </span>
+                    <div className="leading-snug">
+                      <strong className="font-semibold block text-amber-950">
+                        {inAppBrowserName || 'In-App'} Browser Notice
+                      </strong>
+                      <span>
+                        For seamless Google sign-in and to keep your session saved, tap{' '}
+                        <span className="font-bold">•••</span> in the top corner and select{' '}
+                        <span className="underline font-medium">Open in Chrome</span> or{' '}
+                        <span className="underline font-medium">Open in Safari</span>.
+                      </span>
+                    </div>
+                  </div>
+                  {isAndroid() && (
+                    <div className="pt-1 text-right">
+                      <a
+                        href={getChromeIntentUrl(window.location.href)}
+                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-950 bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors"
+                      >
+                        <span>Open in Chrome</span>
+                        <span className="material-symbols-outlined text-xs">arrow_outward</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Error Alert */}
               {errorMsg && (

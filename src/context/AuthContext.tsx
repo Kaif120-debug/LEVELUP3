@@ -15,7 +15,7 @@ interface AuthContextType {
   isConfigured: boolean;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ data: any; error: AuthError | Error | null }>;
   signIn: (email: string, password: string) => Promise<{ data: any; error: AuthError | Error | null }>;
-  signInWithGoogle: () => Promise<{ data: any; error: AuthError | Error | null }>;
+  signInWithGoogle: (targetPath?: string) => Promise<{ data: any; error: AuthError | Error | null }>;
   signOut: () => Promise<{ error: AuthError | Error | null }>;
   resetPassword: (email: string) => Promise<{ data: any; error: AuthError | Error | null }>;
   updatePassword: (newPassword: string) => Promise<{ data: any; error: AuthError | Error | null }>;
@@ -44,16 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         if (configured) {
-          const { data: { session: initialSession }, error } = await supabase.auth.getSession();
-          if (error) {
-            console.warn('Supabase auth session error:', error.message);
-          }
-          if (mounted) {
-            setSession(initialSession);
-            setUser(initialSession?.user ?? null);
-          }
-
-          // Listen for auth changes (login, logout, token refresh, password recovery)
+          // Listen for auth changes FIRST (login, logout, token refresh, password recovery)
           if (!authSubscription) {
             const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, currentSession) => {
               if (mounted) {
@@ -64,12 +55,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             authSubscription = subscription;
           }
+
+          const { data: { session: initialSession }, error } = await supabase.auth.getSession();
+          if (error) {
+            console.warn('Supabase auth session error:', error.message);
+          }
+          if (mounted) {
+            setSession(initialSession);
+            setUser(initialSession?.user ?? null);
+          }
+
+          // If the page URL contains an OAuth code or hash tokens, give the PKCE flow a moment to finish
+          const hasPendingOAuth = typeof window !== 'undefined' && (
+            window.location.search.includes('code=') ||
+            window.location.hash.includes('access_token=')
+          );
+
+          if (hasPendingOAuth && !initialSession && mounted) {
+            // Wait briefly for onAuthStateChange to exchange the code
+            setTimeout(async () => {
+              if (mounted) {
+                const { data: { session: retrySession } } = await supabase.auth.getSession();
+                if (retrySession) {
+                  setSession(retrySession);
+                  setUser(retrySession.user ?? null);
+                }
+                setIsAuthLoading(false);
+              }
+            }, 1500);
+            return;
+          }
         }
       } catch (err) {
         console.error('Error initializing auth session:', err);
       } finally {
         if (mounted) {
-          setIsAuthLoading(false);
+          const hasPendingOAuth = typeof window !== 'undefined' && (
+            window.location.search.includes('code=') ||
+            window.location.hash.includes('access_token=')
+          );
+          if (!hasPendingOAuth) {
+            setIsAuthLoading(false);
+          }
         }
       }
     };
@@ -138,7 +165,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (targetPath: string = '/dashboard') => {
     try {
       await ensureSupabaseReady();
       if (!getIsSupabaseConfigured()) {
@@ -147,7 +174,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           error: new Error('Supabase authentication is not configured yet. Please ensure VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY are set in your environment.'),
         };
       }
-      const redirectTo = getAuthRedirectUrl('/dashboard');
+
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.setItem('levelup_oauth_target', targetPath);
+      }
+
+      const redirectTo = getAuthRedirectUrl('/auth/callback');
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -167,6 +199,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = async () => {
     try {
       await ensureSupabaseReady();
+      if (typeof window !== 'undefined' && window.sessionStorage) {
+        window.sessionStorage.removeItem('levelup_oauth_target');
+      }
       if (getIsSupabaseConfigured()) {
         const { error } = await supabase.auth.signOut();
         setUser(null);

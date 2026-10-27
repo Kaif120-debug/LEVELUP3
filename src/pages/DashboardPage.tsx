@@ -16,6 +16,13 @@ export const DashboardPage: React.FC = () => {
       trackEvent('first_dashboard_visit');
       localStorage.setItem('levelup_dashboard_visited', 'true');
     }
+
+    // Strip any residual OAuth query code or hash tokens from address bar to prevent back-button loops
+    if (typeof window !== 'undefined' && window.location) {
+      if (window.location.search.includes('code=') || window.location.hash.includes('access_token=')) {
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
   }, []);
 
   const handleAddMeal = (e: React.FormEvent) => {

@@ -87,11 +87,37 @@ export let isSupabaseConfigured = getIsSupabaseConfigured();
 
 /**
  * Resolves the base application URL for auth redirects (email confirmation, OAuth, password reset).
+ * Protects against accidental Supabase dashboard or API URLs in VITE_SITE_URL,
+ * ensuring users return to https://levelupapp.co.in in production or the active preview origin in dev.
  */
 export function getAppBaseUrl(): string {
+  // If running in browser, determine domain from current location
+  if (typeof window !== 'undefined' && window.location && window.location.origin) {
+    const origin = window.location.origin;
+    const hostname = window.location.hostname.toLowerCase();
+
+    // If active on the official production domain
+    if (hostname === 'levelupapp.co.in' || hostname === 'www.levelupapp.co.in') {
+      return 'https://levelupapp.co.in';
+    }
+
+    // In local development or AI Studio preview environments, preserve current preview origin
+    if (
+      hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.endsWith('.run.app') ||
+      hostname.endsWith('.pages.dev') ||
+      hostname.endsWith('.vercel.app')
+    ) {
+      return origin;
+    }
+  }
+
+  // Check configured environment variables with strict sanitation
   const configuredUrl = cleanEnvString(
     import.meta.env.VITE_SITE_URL ||
     import.meta.env.VITE_APP_URL ||
+    (typeof process !== 'undefined' && (process.env.VITE_SITE_URL || process.env.SITE_URL || process.env.APP_URL)) ||
     ''
   );
 
@@ -100,26 +126,39 @@ export function getAppBaseUrl(): string {
     if (!clean.startsWith('http://') && !clean.startsWith('https://')) {
       clean = `https://${clean}`;
     }
-    return clean;
+
+    const lower = clean.toLowerCase();
+    // Reject Supabase dashboard, project URLs, or placeholder values
+    const isInvalidSupabaseUrl =
+      lower.includes('supabase.co') ||
+      lower.includes('supabase.com') ||
+      lower.includes('editor/new') ||
+      lower.includes('dashboard') ||
+      lower.includes('placeholder');
+
+    if (!isInvalidSupabaseUrl) {
+      return clean;
+    }
   }
 
   if (typeof window !== 'undefined' && window.location && window.location.origin) {
     return window.location.origin;
   }
 
-  return 'http://localhost:3000';
+  // Default production origin for LEVELUP
+  return 'https://levelupapp.co.in';
 }
 
 /**
  * Builds a full redirect URL for Supabase Auth flows
  */
-export function getAuthRedirectUrl(path: string = ''): string {
+export function getAuthRedirectUrl(path: string = '/auth/callback'): string {
   const base = getAppBaseUrl();
   const cleanPath = path ? (path.startsWith('/') ? path : `/${path}`) : '';
   return `${base}${cleanPath}`;
 }
 
-// Instantiate internal Supabase Client
+// Instantiate internal Supabase Client with PKCE flow and resilient session handling
 function createSupabaseInstance(url: string, key: string): SupabaseClient {
   const validUrl = (url && !isPlaceholderConfig(url, key)) ? url : 'https://placeholder-project.supabase.co';
   const validKey = (key && !isPlaceholderConfig(url, key)) ? key : 'placeholder-anon-key';
@@ -129,6 +168,7 @@ function createSupabaseInstance(url: string, key: string): SupabaseClient {
       persistSession: true,
       autoRefreshToken: true,
       detectSessionInUrl: true,
+      flowType: 'pkce',
     },
   });
 }
