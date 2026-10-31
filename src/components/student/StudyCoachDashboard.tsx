@@ -14,6 +14,8 @@ import {
   Clock,
   Award,
   TrendingUp,
+  FileText,
+  HelpCircle,
 } from 'lucide-react';
 import { StudyPlanGenerator } from './StudyPlanGenerator';
 import { TopicExplainer } from './TopicExplainer';
@@ -21,6 +23,8 @@ import { AIQuizStudio } from './AIQuizStudio';
 import { PracticeQuestionsStudio } from './PracticeQuestionsStudio';
 import { ExamPrepStudio } from './ExamPrepStudio';
 import { WeakTopicsTracker } from './WeakTopicsTracker';
+import { StudyNotesStudio } from './StudyNotesStudio';
+import { LearningAssistantStudio } from './LearningAssistantStudio';
 
 interface StudyCoachDashboardProps {
   onBackToOverview?: () => void;
@@ -127,7 +131,9 @@ export const StudyCoachDashboard: React.FC<StudyCoachDashboardProps> = ({ onBack
       <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-outline-variant/40 scrollbar-none">
         {[
           { id: 'dashboard', label: 'Coach Hub', icon: Sparkles },
-          { id: 'plan', label: 'Study Plan', icon: Calendar },
+          { id: 'plan', label: 'Study Plan & Schedule', icon: Calendar },
+          { id: 'notes', label: 'AI Notes Generator', icon: FileText },
+          { id: 'assistant', label: 'Learning Assistant', icon: HelpCircle },
           { id: 'explain', label: 'Explain Topic', icon: Lightbulb },
           { id: 'quiz', label: 'AI Quiz', icon: Flame },
           { id: 'practice', label: 'Practice Problems', icon: FileCode },
@@ -220,6 +226,50 @@ export const StudyCoachDashboard: React.FC<StudyCoachDashboardProps> = ({ onBack
               </div>
               <div className="mt-5 pt-4 border-t border-outline-variant/30 flex items-center justify-between text-xs font-semibold text-primary">
                 <span>Configure Roadmap</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* 1B. AI Study Notes Generator */}
+            <div
+              onClick={() => setActiveTab('notes')}
+              className="bg-surface border border-outline-variant/60 hover:border-primary/60 rounded-xl p-6 shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-teal-500/10 text-teal-600 dark:text-teal-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <h4 className="font-title-lg text-on-surface font-semibold group-hover:text-teal-600 transition-colors">
+                  AI Notes Generation
+                </h4>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Synthesize lectures and syllabus topics into Cornell notes, rapid cheat sheets, and active recall flashcards.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-outline-variant/30 flex items-center justify-between text-xs font-semibold text-teal-600 dark:text-teal-400">
+                <span>Generate Notes</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+              </div>
+            </div>
+
+            {/* 1C. AI Learning Assistant */}
+            <div
+              onClick={() => setActiveTab('assistant')}
+              className="bg-surface border border-outline-variant/60 hover:border-primary/60 rounded-xl p-6 shadow-sm transition-all cursor-pointer group flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center group-hover:scale-105 transition-transform">
+                  <HelpCircle className="w-6 h-6" />
+                </div>
+                <h4 className="font-title-lg text-on-surface font-semibold group-hover:text-indigo-600 transition-colors">
+                  AI Learning Assistant
+                </h4>
+                <p className="text-xs text-on-surface-variant leading-relaxed">
+                  Interactive step-by-step problem solver and conceptual tutor for homework blockers and tricky theorems.
+                </p>
+              </div>
+              <div className="mt-5 pt-4 border-t border-outline-variant/30 flex items-center justify-between text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                <span>Ask Coach</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
               </div>
             </div>
@@ -350,6 +400,23 @@ export const StudyCoachDashboard: React.FC<StudyCoachDashboardProps> = ({ onBack
           initialSubject={selectedSubject}
           onOpenExplainTopic={(t, s) => handleLaunchExplain(t, s)}
           onOpenQuizTopic={(t, s) => handleLaunchQuiz(t, s)}
+        />
+      )}
+
+      {/* 2B. AI STUDY NOTES VIEW */}
+      {activeTab === 'notes' && (
+        <StudyNotesStudio
+          initialTopic={selectedTopic}
+          initialSubject={selectedSubject}
+          onLaunchQuiz={(t, s) => handleLaunchQuiz(t, s)}
+        />
+      )}
+
+      {/* 2C. AI LEARNING ASSISTANT VIEW */}
+      {activeTab === 'assistant' && (
+        <LearningAssistantStudio
+          initialTopic={selectedTopic}
+          initialSubject={selectedSubject}
         />
       )}
 

@@ -2662,7 +2662,7 @@ export async function upsertUserSubscription(
   sub: {
     plan?: string;
     plan_tier?: string;
-    status?: 'active' | 'inactive' | 'canceled' | 'trial' | 'past_due';
+    status?: 'active' | 'inactive' | 'canceled' | 'cancelled' | 'trial' | 'past_due';
     started_at?: string;
   }
 ): Promise<{ data: DbSubscription | null; error: Error | null; rawError?: any }> {
@@ -2701,26 +2701,53 @@ export async function upsertUserSubscription(
 
     // 3. If row exists: UPDATE existing record
     if (existing?.id || existing?.user_id) {
-      const updatePayload = {
-        plan: targetPlan,
-        status: targetStatus,
-      };
+      // Determine candidate status values to prevent Code 23514 check constraint violations
+      // In PostgreSQL, subscriptions_status_check might require 'cancelled' (double l) or 'inactive'
+      const statusCandidates = isPro
+        ? ['active', 'trialing']
+        : targetStatus === 'canceled' || targetStatus === 'cancelled'
+        ? ['cancelled', 'inactive', 'canceled']
+        : [targetStatus, 'cancelled', 'inactive'];
 
-      const { data: updatedData, error: updateError } = await supabase
-        .from('subscriptions')
-        .update(updatePayload)
-        .eq('user_id', effectiveUserId)
-        .select()
-        .maybeSingle();
+      let updatedData: any = null;
+      let lastUpdateError: any = null;
 
-      if (updateError) {
-        console.warn('[Supabase Subscriptions Direct UPDATE note]:', updateError.message, 'Attempting backend bridge /api/subscription/upgrade...');
+      for (const candidateStatus of statusCandidates) {
+        const updatePayload: any = {
+          plan: targetPlan,
+          status: candidateStatus,
+        };
+
+        const res = await supabase
+          .from('subscriptions')
+          .update(updatePayload)
+          .eq('user_id', effectiveUserId)
+          .select()
+          .maybeSingle();
+
+        if (!res.error && res.data) {
+          updatedData = res.data;
+          lastUpdateError = null;
+          break;
+        }
+
+        lastUpdateError = res.error;
+        if (res.error?.code === '23514') {
+          console.warn(`[Supabase Subscriptions Status Check]: Status '${candidateStatus}' violated check constraint. Retrying next valid status...`);
+          continue;
+        }
+        break;
+      }
+
+      if (lastUpdateError) {
+        console.warn('[Supabase Subscriptions Direct UPDATE note]:', lastUpdateError.message, 'Attempting backend bridge...');
         
         try {
           const { data: sessionData } = await supabase.auth.getSession();
           const token = sessionData?.session?.access_token;
+          const endpoint = !isPro ? '/api/subscription/cancel' : '/api/subscription/upgrade';
 
-          const serverRes = await fetch('/api/subscription/upgrade', {
+          const serverRes = await fetch(endpoint, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -2750,9 +2777,9 @@ export async function upsertUserSubscription(
           console.warn('[Backend Bridge Exception during UPDATE]', bridgeErr.message);
         }
 
-        console.error('[Supabase Subscriptions UPDATE Error]', updateError);
-        const detailedMessage = `Failed to UPDATE subscription in public.subscriptions:\nCode: ${updateError.code}\nMessage: ${updateError.message}\nDetails: ${updateError.details || 'None'}\nHint: ${updateError.hint || 'Check RLS UPDATE policy on subscriptions table'}`;
-        return { data: null, error: new Error(detailedMessage), rawError: updateError };
+        console.error('[Supabase Subscriptions UPDATE Error]', lastUpdateError);
+        const detailedMessage = `Failed to UPDATE subscription in public.subscriptions:\nCode: ${lastUpdateError.code}\nMessage: ${lastUpdateError.message}\nDetails: ${lastUpdateError.details || 'None'}\nHint: ${lastUpdateError.hint || 'Check status value and RLS UPDATE policy on subscriptions table'}`;
+        return { data: null, error: new Error(detailedMessage), rawError: lastUpdateError };
       }
 
       if (!updatedData) {

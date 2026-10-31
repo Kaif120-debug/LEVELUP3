@@ -209,7 +209,7 @@ interface AppContextType {
   openUpgradeModal: (featureName?: string) => void;
   closeUpgradeModal: () => void;
   subscribeUser: (options?: string | { plan?: string; name?: string; email?: string; contact?: string; upiId?: string; method?: 'upi' | 'card' | 'netbanking' }) => Promise<{ success: boolean; error?: string }>;
-  cancelSubscription: () => Promise<{ success: boolean; error?: string }>;
+  cancelSubscription: (immediate?: boolean) => Promise<{ success: boolean; error?: string; message?: string; accessUntil?: string | null }>;
   reconcileSubscription: () => Promise<{ success: boolean; reconciled?: boolean; alreadyActive?: boolean; error?: string }>;
 
   // AI Actions
@@ -2252,7 +2252,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const cancelSubscription = async (): Promise<{ success: boolean; error?: string }> => {
+  const cancelSubscription = async (immediate: boolean = false): Promise<{ success: boolean; error?: string; message?: string; accessUntil?: string | null }> => {
     let currentUserId = user?.id;
     try {
       const { data: authData } = await supabase.auth.getUser();
@@ -2268,27 +2268,89 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     try {
+      // 1. First attempt full server-side cancellation (syncs with Razorpay API and handles check constraint)
+      let sessionToken: string | undefined;
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        sessionToken = sessionData?.session?.access_token;
+      } catch {
+        // ignore
+      }
+
+      const serverRes = await fetch('/api/subscription/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: currentUserId,
+          immediate,
+        }),
+      });
+
+      if (serverRes.ok) {
+        const json = await serverRes.json();
+        if (json?.data) {
+          setDbSubscription(json.data);
+          
+          if (json.cancelAtPeriodEnd) {
+            // User retains Pro access until the current billing cycle expires
+            setState((prev) => ({
+              ...prev,
+              subscription: {
+                ...prev.subscription,
+                status: 'active',
+                cancelAtPeriodEnd: true,
+                nextBillingDate: json.accessUntil
+                  ? new Date(json.accessUntil).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : prev.subscription?.nextBillingDate,
+              },
+            }));
+          } else {
+            // Immediate cancellation
+            setState((prev) => ({
+              ...prev,
+              subscription: {
+                status: 'inactive',
+                plan: 'LEVELUP_FREE',
+                amount: 0,
+                currency: 'INR',
+              },
+            }));
+          }
+
+          return {
+            success: true,
+            message: json.message,
+            accessUntil: json.accessUntil,
+          };
+        }
+      }
+
+      // 2. Client-side fallback if server route not reachable
       const res = await db.upsertUserSubscription(currentUserId, {
-        plan: 'free',
-        status: 'canceled',
+        plan: immediate ? 'free' : (dbSubscription?.plan || 'pro'),
+        status: immediate ? 'canceled' : 'active',
       });
 
       if (res.error || !res.data) {
         console.error('Failed to cancel subscription in Supabase:', res.error);
-        alert(`Failed to cancel subscription: ${res.error?.message || 'Unknown database error'}`);
         return { success: false, error: res.error?.message };
       }
 
       setDbSubscription(res.data);
-      setState((prev) => ({
-        ...prev,
-        subscription: {
-          status: 'inactive',
-          plan: 'LEVELUP_FREE',
-          amount: 0,
-          currency: 'INR',
-        },
-      }));
+      if (immediate) {
+        setState((prev) => ({
+          ...prev,
+          subscription: {
+            status: 'inactive',
+            plan: 'LEVELUP_FREE',
+            amount: 0,
+            currency: 'INR',
+          },
+        }));
+      }
 
       return { success: true };
     } catch (err: any) {

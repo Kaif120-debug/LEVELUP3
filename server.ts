@@ -30,9 +30,24 @@ app.use(
   })
 );
 
+// Helper to format/sanitize Supabase URL from dashboard or raw project ref
+function formatSupabaseUrl(raw: string): string {
+  if (!raw) return "";
+  let clean = raw.trim();
+  const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-zA-Z0-9_-]+)/);
+  if (dashboardMatch && dashboardMatch[1]) {
+    return `https://${dashboardMatch[1]}.supabase.co`;
+  }
+  if (/^[a-zA-Z0-9_-]{15,35}$/.test(clean)) {
+    return `https://${clean}.supabase.co`;
+  }
+  return clean.replace(/\/+$/, '');
+}
+
 // Helper to resolve Supabase server-side client
 function getSupabaseServerClient(userToken?: string) {
-  const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+  const rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+  const supabaseUrl = formatSupabaseUrl(rawUrl);
   const serviceRoleKey = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
   const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
 
@@ -77,8 +92,9 @@ function getAI(): GoogleGenAI | null {
 
 /**
  * Robust Gemini model cascade executor.
- * Automatically tries active high-availability models (gemini-3.7-flash -> gemini-3.6-flash -> gemini-3.5-flash-lite)
- * and handles temporary 503 high-demand spikes and 429 rate limits gracefully.
+ * Automatically tries active high-availability models:
+ * gemini-3.8-flash -> gemini-flash-latest -> gemini-3.1-flash-lite
+ * Handles temporary 503 high-demand spikes, timeouts, and rate limits gracefully.
  */
 async function callGeminiCascade(
   contents: string,
@@ -93,15 +109,18 @@ async function callGeminiCascade(
 
   const candidateModels = [
     "gemini-3.8-flash",
-    "gemini-3.1-flash-lite",
-    "gemini-3.7-flash",
-    "gemini-3.6-flash",
     "gemini-flash-latest",
+    "gemini-3.1-flash-lite",
   ];
 
   for (const model of candidateModels) {
     try {
-      const response = await ai.models.generateContent({
+      // Create a timeout promise to prevent any single model hanging too long
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout: ${model} took longer than 15s`)), 15000)
+      );
+
+      const requestPromise = ai.models.generateContent({
         model,
         contents,
         config: {
@@ -111,7 +130,9 @@ async function callGeminiCascade(
         },
       });
 
-      if (response.text && response.text.trim()) {
+      const response: any = await Promise.race([requestPromise, timeoutPromise]);
+
+      if (response?.text && response.text.trim()) {
         return { text: response.text, modelUsed: model };
       }
     } catch (err: any) {
@@ -124,12 +145,13 @@ async function callGeminiCascade(
         err?.message?.includes("429") ||
         err?.message?.includes("high demand") ||
         err?.message?.includes("UNAVAILABLE") ||
-        err?.message?.includes("RESOURCE_EXHAUSTED");
+        err?.message?.includes("RESOURCE_EXHAUSTED") ||
+        err?.message?.includes("Timeout");
 
       if (isTemporaryDemand) {
-        console.log(`[AI Cascade] Model ${model} is experiencing high demand (${err?.status || err?.error?.code || 503}). Cascading to next model...`);
+        console.log(`[AI Cascade] Model ${model} unavailable/busy (${err?.message || err?.status || 503}). Cascading to next model...`);
       } else {
-        console.log(`[AI Cascade] Model ${model} notice: ${err?.message || 'non-fatal error'}. Cascading to next model...`);
+        console.log(`[AI Cascade] Model ${model} notice: ${err?.message || 'non-fatal'}. Cascading to next model...`);
       }
     }
   }
@@ -1077,15 +1099,16 @@ app.post("/api/subscription/upgrade", async (req, res) => {
   }
 });
 
-// Subscription Cancel Endpoint
+// Subscription Cancel Endpoint with Razorpay sync, check constraint safety, and period-end access
 app.post("/api/subscription/cancel", async (req, res) => {
   const authHeader = req.headers.authorization || "";
   const token = authHeader.replace(/^Bearer\s+/i, "").trim();
-  const { userId } = req.body || {};
+  const { userId, immediate = false } = req.body || {};
 
   try {
     let effectiveUserId = userId;
-    const supabaseUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+    const rawUrl = (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").trim();
+    const supabaseUrl = formatSupabaseUrl(rawUrl);
     const anonKey = (process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || "").trim();
 
     if (token && anonKey && supabaseUrl) {
@@ -1109,26 +1132,134 @@ app.post("/api/subscription/cancel", async (req, res) => {
       return res.status(500).json({ error: "Unable to initialize Supabase client" });
     }
 
-    const { data: updated, error: updErr } = await client
+    // 1. Fetch current subscription to inspect razorpay_subscription_id and current status
+    const { data: existingSub } = await client
       .from("subscriptions")
-      .update({
-        plan: "free",
-        status: "canceled",
-      })
+      .select("*")
       .eq("user_id", effectiveUserId)
-      .select()
+      .limit(1)
       .maybeSingle();
 
-    if (updErr) {
-      return res.status(400).json({
-        error: updErr.message,
-        code: updErr.code,
-        details: updErr.details,
-        hint: updErr.hint,
+    // Prevent duplicate cancellation if already cancelled or already set to cancel at period end
+    if (existingSub?.cancel_at_period_end && !immediate) {
+      return res.json({
+        success: true,
+        alreadyCancelled: true,
+        data: existingSub,
+        message: "Subscription is already scheduled to cancel at the end of the billing period.",
+        accessUntil: existingSub.current_period_end || existingSub.expires_at,
       });
     }
 
-    return res.json({ success: true, data: updated });
+    // 2. Sync cancellation with Razorpay if active Razorpay subscription ID exists
+    const razorpayKeyId = (process.env.RAZORPAY_KEY_ID || process.env.VITE_RAZORPAY_KEY_ID || "").trim();
+    const razorpayKeySecret = (process.env.RAZORPAY_KEY_SECRET || "").trim();
+    const rzpSubId = existingSub?.razorpay_subscription_id;
+
+    if (rzpSubId && razorpayKeyId && razorpayKeySecret) {
+      try {
+        const authBase64 = Buffer.from(`${razorpayKeyId}:${razorpayKeySecret}`).toString("base64");
+        const rzpCancelUrl = `https://api.razorpay.com/v1/subscriptions/${encodeURIComponent(rzpSubId)}/cancel`;
+        
+        const rzpResponse = await fetch(rzpCancelUrl, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Basic ${authBase64}`,
+          },
+          body: JSON.stringify({
+            cancel_at_cycle_end: immediate ? 0 : 1,
+          }),
+        });
+
+        const rzpJson = await rzpResponse.json().catch(() => null);
+        console.log(`[Razorpay Cancel Sync] Sub ${rzpSubId}:`, rzpResponse.status, rzpJson?.status || rzpJson?.error?.description);
+      } catch (rzpErr: any) {
+        console.warn("[Razorpay Cancel Sync Notice]:", rzpErr?.message);
+      }
+    }
+
+    // 3. Update Supabase public.subscriptions with constraint-safe status cascade
+    // In PostgreSQL, subscriptions_status_check may enforce ('active', 'cancelled', 'past_due', 'inactive')
+    // Attempting 'cancelled' (double l) or 'inactive' prevents Code 23514 check constraint violation.
+    const nowIso = new Date().toISOString();
+    const accessUntil = existingSub?.current_period_end || existingSub?.expires_at || null;
+    
+    // If not immediate and period end is in the future, user stays active with cancel_at_period_end: true
+    const keepActiveUntilPeriodEnd = !immediate && accessUntil && new Date(accessUntil).getTime() > Date.now();
+    
+    const candidateStatuses = keepActiveUntilPeriodEnd
+      ? ["active"]
+      : ["cancelled", "inactive", "canceled"];
+
+    let updated: any = null;
+    let lastError: any = null;
+
+    for (const testStatus of candidateStatuses) {
+      const updatePayload: any = {
+        plan: keepActiveUntilPeriodEnd ? (existingSub?.plan || "pro") : "free",
+        status: testStatus,
+        cancel_at_period_end: true,
+        updated_at: nowIso,
+      };
+
+      const resUpdate = await client
+        .from("subscriptions")
+        .update(updatePayload)
+        .eq("user_id", effectiveUserId)
+        .select()
+        .maybeSingle();
+
+      if (!resUpdate.error && resUpdate.data) {
+        updated = resUpdate.data;
+        break;
+      }
+
+      // If error is column not found (e.g. cancel_at_period_end doesn't exist), retry without it
+      if (resUpdate.error?.code === "42703") {
+        const fallbackPayload = {
+          plan: keepActiveUntilPeriodEnd ? (existingSub?.plan || "pro") : "free",
+          status: testStatus,
+        };
+        const resRetry = await client
+          .from("subscriptions")
+          .update(fallbackPayload)
+          .eq("user_id", effectiveUserId)
+          .select()
+          .maybeSingle();
+
+        if (!resRetry.error && resRetry.data) {
+          updated = resRetry.data;
+          break;
+        }
+        lastError = resRetry.error;
+      } else {
+        lastError = resUpdate.error;
+        // If check constraint 23514 violated, loop will test next status in candidateStatuses
+        if (resUpdate.error?.code === "23514") {
+          console.warn(`[Sub Cancel Constraint Check] Status '${testStatus}' violated subscriptions_status_check. Trying next candidate...`);
+        }
+      }
+    }
+
+    if (!updated && lastError) {
+      return res.status(400).json({
+        error: lastError.message,
+        code: lastError.code,
+        details: lastError.details,
+        hint: lastError.hint,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: updated,
+      accessUntil,
+      cancelAtPeriodEnd: keepActiveUntilPeriodEnd,
+      message: keepActiveUntilPeriodEnd
+        ? `Subscription cancellation scheduled. You retain full LEVELUP Pro access until ${new Date(accessUntil).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}.`
+        : "Subscription successfully cancelled.",
+    });
   } catch (err: any) {
     return res.status(500).json({ error: err.message || "Internal server error" });
   }
@@ -5494,7 +5625,7 @@ Return ONLY a valid JSON object matching this schema:
     });
 
     if (result?.text) {
-      const parsed = JSON.parse(result.text.trim());
+      const parsed = safeExtractJson(result.text);
       if (parsed && parsed.priorityTopics && parsed.priorityTopics.length > 0) {
         return res.json(parsed);
       }
@@ -5576,6 +5707,371 @@ Return ONLY a valid JSON object matching this schema:
       "Start the exam by answering highest-confidence questions first to build momentum.",
     ],
     createdAt: new Date().toISOString(),
+  });
+});
+
+// 6. AI Notes Generator Endpoint (Cornell, Summary, Cheatsheets & Flashcards)
+app.post("/api/ai/study/notes", async (req, res) => {
+  const {
+    topic = "Database Indexing & B-Trees",
+    subject = "Computer Science",
+    format = "cornell", // cornell | cheatsheet | executive
+    detailLevel = "comprehensive", // concise | comprehensive
+  } = req.body || {};
+
+  const prompt = `You are LEVELUP AI Academic Master Scribe and Cognitive Retention Specialist.
+Generate structured, master-level academic study notes for:
+- Topic: ${topic}
+- Subject: ${subject}
+- Format: ${format}
+- Detail Level: ${detailLevel}
+
+Return strictly a valid JSON object matching this schema:
+{
+  "id": "notes-${Date.now()}",
+  "title": "Master Study Notes: ${topic}",
+  "subject": "${subject}",
+  "topic": "${topic}",
+  "format": "${format}",
+  "overview": "2-3 sentence executive synopsis highlighting foundational significance",
+  "cornellCues": [
+    {
+      "cueQuestion": "Active recall question or core prompt keyword",
+      "noteContent": "Precise, punchy answer or principle to memorize",
+      "importance": "high"
+    },
+    {
+      "cueQuestion": "Why does this edge case matter in exams?",
+      "noteContent": "Clear differentiator explaining how to avoid common traps",
+      "importance": "medium"
+    }
+  ],
+  "mainSections": [
+    {
+      "sectionTitle": "1. Foundational Architecture & Mechanics",
+      "summary": "Core structural overview",
+      "bulletPoints": [
+        "In-depth explanation bullet with high pedagogical rigor",
+        "Key mathematical or mechanical relationship",
+        "How this component connects to real-world systems"
+      ],
+      "codeOrFormula": "-- Core syntax or formula representation\\nCREATE INDEX idx_sample ON table(col);",
+      "language": "sql"
+    },
+    {
+      "sectionTitle": "2. High-Yield Trade-offs & Analysis",
+      "summary": "Critical evaluation criteria",
+      "bulletPoints": [
+        "Time complexity vs Space complexity trade-off",
+        "Best-case and worst-case performance nuances",
+        "When to choose this pattern over alternatives"
+      ]
+    }
+  ],
+  "keyFormulasOrRules": [
+    {
+      "ruleName": "Asymptotic Lookup Bound",
+      "formula": "O(log N)",
+      "meaning": "Logarithmic search tree traversal guarantee"
+    }
+  ],
+  "examCheatSheet": [
+    "Rule 1: Always verify primary determinant before normalizing relations.",
+    "Rule 2: Check balance invariant after insertion and deletion.",
+    "Rule 3: Beware of off-by-one errors in binary search boundaries."
+  ],
+  "flashcards": [
+    {
+      "front": "What is the primary benefit of ${topic}?",
+      "back": "Drastically reduces search and retrieval operations through hierarchical partitioning."
+    },
+    {
+      "front": "What is the most frequent student misconception regarding ${topic}?",
+      "back": "Assuming linear degradation instead of logarithmic or constant time bounds."
+    }
+  ],
+  "createdAt": "${new Date().toISOString()}"
+}`;
+
+  try {
+    const result = await callGeminiCascade(prompt, {
+      systemInstruction: "You are an elite academic scribe and professor. Output perfectly formatted, highly structured educational JSON notes.",
+      responseMimeType: "application/json",
+      temperature: 0.7,
+    });
+
+    if (result?.text) {
+      const parsed = safeExtractJson(result.text);
+      if (parsed && (parsed.cornellCues || parsed.mainSections || parsed.title)) {
+        return res.json(parsed);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[AI Study Notes Error]:", err?.message);
+  }
+
+  // Graceful fallback notes
+  return res.json({
+    id: `notes-fb-${Date.now()}`,
+    title: `Master Study Notes: ${topic}`,
+    subject,
+    topic,
+    format,
+    overview: `These condensed notes synthesize core principles, practical examples, and exam formulas for ${topic} in ${subject}.`,
+    cornellCues: [
+      {
+        cueQuestion: `What defines ${topic} fundamentally?`,
+        noteContent: `Core structural principle governing state, execution, and optimization.`,
+        importance: "high",
+      },
+      {
+        cueQuestion: `What is the most common exam question pattern?`,
+        noteContent: `Trade-off analysis between computational complexity and memory footprint.`,
+        importance: "high",
+      },
+    ],
+    mainSections: [
+      {
+        sectionTitle: "1. Core Principles & Theoretical Basis",
+        summary: "Fundamental definitions and mathematical axioms.",
+        bulletPoints: [
+          `Deconstructs problems into deterministic, invariant components.`,
+          `Guarantees predictable asymptotic complexity under standard operating assumptions.`,
+          `Forms the prerequisite foundation for advanced systems design.`,
+        ],
+        codeOrFormula: `// Canonical representation of ${topic}\nfunction evaluate(input) {\n  return executeTarget(input);\n}`,
+        language: "typescript",
+      },
+      {
+        sectionTitle: "2. Real-World Applications & Edge Cases",
+        summary: "Production considerations and edge failure modes.",
+        bulletPoints: [
+          `Handle boundary conditions and empty or null values proactively.`,
+          `Assess lock contention or resource contention in multi-threaded workflows.`,
+        ],
+      },
+    ],
+    keyFormulasOrRules: [
+      {
+        ruleName: "Fundamental Invariant",
+        formula: "T(n) = O(log n) or O(1)",
+        meaning: "Upper bound under balanced operating parameters",
+      },
+    ],
+    examCheatSheet: [
+      `Review key definitions 24 hours prior to test.`,
+      `Verify all edge conditions before finalizing answers.`,
+      `Use active recall instead of passive reading.`,
+    ],
+    flashcards: [
+      {
+        front: `Define the core mechanism of ${topic}.`,
+        back: `Structured decomposition ensuring reliable performance and invariant preservation.`,
+      },
+      {
+        front: `State the primary advantage in practical software engineering.`,
+        back: `Scalable execution with bounded worst-case latency and clean separation of concerns.`,
+      },
+    ],
+    createdAt: new Date().toISOString(),
+  });
+});
+
+// 7. AI Interactive Academic Learning Assistant (Step-by-Step Solver & Tutor)
+app.post("/api/ai/study/assistant", async (req, res) => {
+  const {
+    query = "How do I calculate the time complexity of recursive algorithms?",
+    topic = "Algorithms & Complexity",
+    subject = "Computer Science",
+  } = req.body || {};
+
+  const prompt = `You are LEVELUP AI Academic Tutor & Subject Coach.
+A student is asking for learning assistance on:
+- Question: ${query}
+- Topic: ${topic}
+- Subject: ${subject}
+
+Provide a supportive, pedagogically brilliant, step-by-step response.
+Return strictly valid JSON:
+{
+  "answer": "Direct, illuminating 2-3 paragraph explanation answering the question clearly",
+  "steps": [
+    {
+      "stepNumber": 1,
+      "title": "Clear step title",
+      "explanation": "Actionable explanation of this step"
+    }
+  ],
+  "keyRuleOrFormula": "High-yield theorem, formula, or golden rule to remember",
+  "exampleSnippet": {
+    "title": "Concrete Worked Example",
+    "content": "Code or formula step showing the solution",
+    "language": "typescript"
+  },
+  "commonMisconception": "One subtle trap or error students frequently make on this exact question",
+  "suggestedFollowUps": [
+    "Relevant follow-up question 1",
+    "Relevant follow-up question 2"
+  ]
+}`;
+
+  try {
+    const result = await callGeminiCascade(prompt, {
+      systemInstruction: "You are a world-class academic tutor. Help the student understand deeply with clear steps and active learning prompts.",
+      responseMimeType: "application/json",
+      temperature: 0.7,
+    });
+
+    if (result?.text) {
+      const parsed = safeExtractJson(result.text);
+      if (parsed && parsed.answer) {
+        return res.json(parsed);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[AI Learning Assistant Error]:", err?.message);
+  }
+
+  return res.json({
+    answer: `Here is a clear breakdown for "${query}". In ${subject}, master educators tackle this by breaking down the problem into three fundamental phases: identifying the base axiom, tracing the transformation invariant, and validating against boundary conditions.`,
+    steps: [
+      {
+        stepNumber: 1,
+        title: "Identify the Governing Rule",
+        explanation: "Determine the exact theorem or definition that applies to this question before computing.",
+      },
+      {
+        stepNumber: 2,
+        title: "Apply Step-by-Step Reduction",
+        explanation: "Substitute known parameters and simplify iteratively without skipping intermediate logic.",
+      },
+      {
+        stepNumber: 3,
+        title: "Verify Against Edge Cases",
+        explanation: "Test minimal inputs (0, 1, null, max) to ensure the solution holds universally.",
+      },
+    ],
+    keyRuleOrFormula: `Mastery Axiom: Always prove correctness on n=1 and n=k+1 before evaluating complexity.`,
+    exampleSnippet: {
+      title: "Sample Verification Pattern",
+      content: `// Step 1: Base Case check\nif (n <= 1) return 1;\n// Step 2: Recursive relation T(n) = 2T(n/2) + O(n)\nreturn evaluate(n / 2) + evaluate(n / 2);`,
+      language: "typescript",
+    },
+    commonMisconception: "Confusing worst-case asymptotic bounds with average or amortized runtime.",
+    suggestedFollowUps: [
+      `How does this apply to real-world multi-threaded systems?`,
+      `Can you give me a practice problem to test my understanding?`,
+    ],
+  });
+});
+
+// 8. AI Academic Study Schedule Generator
+app.post("/api/ai/study/schedule", async (req, res) => {
+  const {
+    courses = ["Database Systems", "Algorithms", "Computer Networks"],
+    dailyStudyHours = 2,
+    targetGoal = "Consistent Academic Progress",
+  } = req.body || {};
+
+  const hours = Math.min(10, Math.max(1, Number(dailyStudyHours) || 2));
+  const coursesList = Array.isArray(courses) && courses.length > 0 ? courses : ["Core Course 1", "Core Course 2"];
+
+  const prompt = `You are LEVELUP AI Study Schedule Architect.
+Build an optimal 7-day balanced weekly study schedule for a student.
+- Courses: ${coursesList.join(", ")}
+- Daily Available Hours: ${hours} hours/day
+- Goal: ${targetGoal}
+
+Return strictly valid JSON:
+{
+  "id": "sched-${Date.now()}",
+  "scheduleTitle": "7-Day High-Retention Academic Schedule",
+  "dailyHours": ${hours},
+  "strategyNote": "2-sentence cognitive rationale on interleaving and spaced review",
+  "days": [
+    {
+      "dayName": "Monday",
+      "focusCourse": "${coursesList[0] || 'Primary Course'}",
+      "totalMinutes": ${hours * 60},
+      "blocks": [
+        {
+          "timeSlot": "Morning / Session 1",
+          "subject": "${coursesList[0] || 'Primary Course'}",
+          "durationMinutes": ${Math.floor((hours * 60) * 0.6)},
+          "activity": "Deep Concept Absorption & Active Problem Solving"
+        },
+        {
+          "timeSlot": "Evening / Session 2",
+          "subject": "${coursesList[1] || coursesList[0] || 'Secondary Course'}",
+          "durationMinutes": ${Math.floor((hours * 60) * 0.4)},
+          "activity": "Flashcard Spaced Review & Self-Quiz"
+        }
+      ]
+    }
+  ],
+  "weeklyMilestones": [
+    "Complete 4 active recall drills across all registered courses",
+    "Maintain 100% adherence to spaced repetition blocks"
+  ]
+}`;
+
+  try {
+    const result = await callGeminiCascade(prompt, {
+      systemInstruction: "You are an elite academic schedule strategist. Return structured weekly study schedules in JSON.",
+      responseMimeType: "application/json",
+      temperature: 0.7,
+    });
+
+    if (result?.text) {
+      const parsed = safeExtractJson(result.text);
+      if (parsed && parsed.days && parsed.days.length > 0) {
+        return res.json(parsed);
+      }
+    }
+  } catch (err: any) {
+    console.warn("[AI Study Schedule Error]:", err?.message);
+  }
+
+  const daysOfWeek = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+  const fallbackDays = daysOfWeek.map((dayName, idx) => {
+    const primary = coursesList[idx % coursesList.length] || "Course A";
+    const secondary = coursesList[(idx + 1) % coursesList.length] || "Course B";
+    const totalMins = hours * 60;
+    const part1 = Math.floor(totalMins * 0.65);
+    const part2 = totalMins - part1;
+
+    return {
+      dayName,
+      focusCourse: primary,
+      totalMinutes: totalMins,
+      blocks: [
+        {
+          timeSlot: "Block 1 (Deep Work)",
+          subject: primary,
+          durationMinutes: part1,
+          activity: "Concept reading, active note-taking & practice problems",
+        },
+        {
+          timeSlot: "Block 2 (Consolidation)",
+          subject: secondary,
+          durationMinutes: part2,
+          activity: "Flash revision, self-quizzing & error logging",
+        },
+      ],
+    };
+  });
+
+  return res.json({
+    id: `sched-fb-${Date.now()}`,
+    scheduleTitle: `7-Day High-Performance Study Schedule (${hours} hrs/day)`,
+    dailyHours: hours,
+    strategyNote: "Interleaves primary conceptual focus with rapid secondary revision blocks to maximize memory consolidation and prevent burnout.",
+    days: fallbackDays,
+    weeklyMilestones: [
+      "Complete all scheduled deep work blocks with zero phone interruptions",
+      "Log at least 3 practice quizzes across primary subjects",
+      "Consolidate error journal on Sunday evening",
+    ],
   });
 });
 

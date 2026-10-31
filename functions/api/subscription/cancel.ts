@@ -84,20 +84,46 @@ export async function onRequestPost(context: any) {
       return jsonResponse({ success: false, error: "Authenticated user ID is required" }, 400);
     }
 
-    const client = createClient(supabaseUrl, anonKey, {
+    function formatSupabaseUrl(raw: string): string {
+      if (!raw) return "";
+      let clean = raw.trim();
+      const dashboardMatch = clean.match(/supabase\.com\/dashboard\/project\/([a-zA-Z0-9_-]+)/);
+      if (dashboardMatch && dashboardMatch[1]) {
+        return `https://${dashboardMatch[1]}.supabase.co`;
+      }
+      return clean.replace(/\/+$/, '');
+    }
+
+    const cleanUrl = formatSupabaseUrl(supabaseUrl);
+    const client = createClient(cleanUrl, anonKey, {
       global: { headers: token ? { Authorization: `Bearer ${token}` } : {} },
     });
 
-    const { error: cancelErr } = await client
-      .from("subscriptions")
-      .update({
-        plan: "free",
-        status: "canceled",
-      })
-      .eq("user_id", effectiveUserId);
+    const candidateStatuses = ["cancelled", "inactive", "canceled"];
+    let lastError: any = null;
+    let cancelSucceeded = false;
 
-    if (cancelErr) {
-      return jsonResponse({ success: false, error: cancelErr.message }, 400);
+    for (const testStatus of candidateStatuses) {
+      const { error: cancelErr } = await client
+        .from("subscriptions")
+        .update({
+          plan: "free",
+          status: testStatus,
+        })
+        .eq("user_id", effectiveUserId);
+
+      if (!cancelErr) {
+        cancelSucceeded = true;
+        break;
+      }
+      lastError = cancelErr;
+      if (cancelErr.code !== "23514") {
+        break;
+      }
+    }
+
+    if (!cancelSucceeded && lastError) {
+      return jsonResponse({ success: false, error: lastError.message }, 400);
     }
 
     return jsonResponse({ success: true, message: "Subscription cancelled" }, 200);

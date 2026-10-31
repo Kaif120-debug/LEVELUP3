@@ -809,12 +809,14 @@ export interface NotificationItem {
 }
 
 export interface UserSubscription {
-  status: 'active' | 'inactive' | 'trial';
+  status: 'active' | 'inactive' | 'trial' | 'canceled' | 'cancelled';
   plan: 'LEVELUP_MONTHLY' | 'LEVELUP_PRO' | 'LEVELUP_FREE';
   amount: number;
   currency: string;
   startDate?: string;
   nextBillingDate?: string;
+  cancelAtPeriodEnd?: boolean;
+  cancel_at_period_end?: boolean;
 }
 
 export interface DbSubscription {
@@ -822,7 +824,7 @@ export interface DbSubscription {
   user_id: string;
   plan?: string;
   plan_tier?: string;
-  status: 'active' | 'inactive' | 'canceled' | 'trial' | 'past_due';
+  status: 'active' | 'inactive' | 'canceled' | 'cancelled' | 'trial' | 'past_due';
   started_at?: string;
   expires_at?: string;
   current_period_end?: string;
@@ -1367,7 +1369,7 @@ export interface MockInterviewSession {
 
 export type StudyLevel = 'Beginner' | 'Intermediate' | 'Advanced';
 export type StudyGoal = 'Ace Exam (90%+)' | 'Master Fundamentals' | 'Quick Revision & Practice' | 'Pass Course' | 'Complete Homework / Project';
-export type StudyToolTab = 'dashboard' | 'plan' | 'explain' | 'quiz' | 'practice' | 'exam' | 'weaknesses';
+export type StudyToolTab = 'dashboard' | 'plan' | 'notes' | 'assistant' | 'explain' | 'quiz' | 'practice' | 'exam' | 'weaknesses';
 
 export interface StudyPlanTask {
   id: string;
