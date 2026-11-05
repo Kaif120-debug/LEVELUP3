@@ -11,6 +11,15 @@ import { onRequestPost as regenerateDayPost, onRequestOptions as regenerateDayOp
 import { onRequestPost as generateWorkoutPost, onRequestOptions as generateWorkoutOptions } from "./functions/api/ai/generate-workout";
 import { onRequestPost as macroCalculatePost, onRequestOptions as macroCalculateOptions } from "./functions/api/ai/macro-coach/calculate";
 import { onRequestPost as macroChatPost, onRequestOptions as macroChatOptions } from "./functions/api/ai/macro-coach/chat";
+import { onRequestPost as studyPlanPost } from "./functions/api/ai/study/plan";
+import { onRequestPost as studyExplainPost } from "./functions/api/ai/study/explain";
+import { onRequestPost as studyQuizPost } from "./functions/api/ai/study/quiz";
+import { onRequestPost as studyPracticePost } from "./functions/api/ai/study/practice";
+import { onRequestPost as studyExamPrepPost } from "./functions/api/ai/study/exam-prep";
+import { onRequestPost as studyNotesPost } from "./functions/api/ai/study/notes";
+import { onRequestPost as studyAssistantPost } from "./functions/api/ai/study/assistant";
+import { onRequestPost as studySchedulePost } from "./functions/api/ai/study/schedule";
+import { handleGeneralAiRoute } from "./functions/api/ai/general";
 
 export default {
   async fetch(request: Request, env: any, ctx: any): Promise<Response> {
@@ -231,7 +240,69 @@ export default {
       );
     }
 
-    // 8. Fallback for unmatched API routes
+    // 8. AI Student OS routes
+    if (pathname === "/api/ai/study/plan") {
+      if (method === "POST") return studyPlanPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/explain") {
+      if (method === "POST") return studyExplainPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/quiz") {
+      if (method === "POST") return studyQuizPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/practice") {
+      if (method === "POST") return studyPracticePost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/exam-prep") {
+      if (method === "POST") return studyExamPrepPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/notes") {
+      if (method === "POST") return studyNotesPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/assistant") {
+      if (method === "POST") return studyAssistantPost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    if (pathname === "/api/ai/study/schedule") {
+      if (method === "POST") return studySchedulePost(context);
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // 9. General AI Gateways (Finance, Creator, Career, Portfolio, Chat, ATS, Diet)
+    const generalAiPrefixes = [
+      "/api/ai/insights",
+      "/api/ai/chat",
+      "/api/ai/ats-optimize",
+      "/api/ai/resume/",
+      "/api/ai/creator-ideas",
+      "/api/ai/generate-diet",
+      "/api/ai/portfolio/",
+      "/api/ai/finance/",
+      "/api/ai/interview-prep/",
+      "/api/ai/mock-interview/",
+      "/api/career/",
+    ];
+    if (generalAiPrefixes.some((prefix) => pathname.startsWith(prefix))) {
+      if (method === "POST") {
+        return handleGeneralAiRoute(pathname, context);
+      }
+      return new Response(JSON.stringify({ error: `Method ${method} not allowed. Expected POST.` }), { status: 405, headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    }
+
+    // 10. Fallback for unmatched API routes
     if (pathname.startsWith("/api/")) {
       return new Response(
         JSON.stringify({ error: `API endpoint ${pathname} not found` }),
